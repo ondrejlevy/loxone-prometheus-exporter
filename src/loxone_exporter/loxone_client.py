@@ -55,6 +55,8 @@ class LoxoneClient:
         self._ws: Any = None
         self._keepalive_task: asyncio.Task[None] | None = None
         self._last_recv_time: float = 0.0
+        self._use_encryption = ms_config.use_encryption or ms_config.force_encryption
+        self._detected_miniserver_2 = False
 
     def get_state(self) -> MiniserverState:
         """Return the current MiniserverState snapshot."""
@@ -62,9 +64,10 @@ class LoxoneClient:
 
     async def _connect_and_setup(self, ws: Any) -> None:
         """Authenticate, download structure, and subscribe on a new connection."""
+        protocol = "wss" if self._use_encryption else "ws"
         logger.info(
-            "[%s] Connected to ws://%s:%d, authenticating...",
-            self._config.name, self._config.host, self._config.port,
+            "[%s] Connected to %s://%s:%d, authenticating...",
+            self._config.name, protocol, self._config.host, self._config.port,
         )
 
         # Authenticate
@@ -88,10 +91,31 @@ class LoxoneClient:
         self._state.state_map = state_map
         self._state.serial = structure.get("msInfo", {}).get("serialNr", "")
         self._state.firmware = str(structure.get("softwareVersion", ""))
+        self._state.miniserver_type = int(structure.get("msInfo", {}).get("miniserverType", 0))
+
+        # Check if this is Miniserver 2 (Gen2) and encryption should be used
+        if self._state.miniserver_type == 2 and not self._use_encryption:
+            if self._config.force_encryption:
+                logger.error(
+                    "[%s] Miniserver 2 detected but not using encryption. "
+                    "force_encryption is enabled, so this connection will be closed.",
+                    self._config.name
+                )
+                raise LoxoneConnectionError("Miniserver 2 requires encrypted connection")
+            else:
+                logger.warning(
+                    "[%s] Miniserver 2 detected. Encryption should be used for secure communication. "
+                    "Reconnecting with encryption enabled...",
+                    self._config.name
+                )
+                self._detected_miniserver_2 = True
+                self._use_encryption = True
+                # Close current connection to trigger reconnect with encryption
+                raise LoxoneConnectionError("Switching to encrypted connection for Miniserver 2")
 
         logger.info(
-            "[%s] Structure loaded: %d controls, %d rooms, %d categories",
-            self._config.name, len(controls), len(rooms), len(categories),
+            "[%s] Structure loaded: %d controls, %d rooms, %d categories (Miniserver Type: %d)",
+            self._config.name, len(controls), len(rooms), len(categories), self._state.miniserver_type,
         )
 
         # Subscribe to binary status updates
@@ -165,11 +189,21 @@ class LoxoneClient:
 
         Runs until cancelled via ``asyncio.CancelledError``.
         """
-        uri = f"ws://{self._config.host}:{self._config.port}/ws/rfc6455"
-
         while True:
+            protocol = "wss" if self._use_encryption else "ws"
+            uri = f"{protocol}://{self._config.host}:{self._config.port}/ws/rfc6455"
+
             try:
-                async with websockets.connect(uri) as ws:
+                # For wss, we need ssl context
+                ssl_context = None
+                if self._use_encryption:
+                    import ssl
+                    ssl_context = ssl.create_default_context()
+                    # Allow self-signed certificates for local Miniserver
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+
+                async with websockets.connect(uri, ssl=ssl_context) as ws:
                     self._ws = ws
                     try:
                         await self._connect_and_setup(ws)

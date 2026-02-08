@@ -32,6 +32,8 @@ class MiniserverConfig:
     port: int = 80
     username: str = ""
     password: str = ""
+    use_encryption: bool = False
+    force_encryption: bool = False
 
 
 @dataclass(frozen=True)
@@ -117,6 +119,8 @@ def _build_ms_config(raw: dict[str, Any]) -> MiniserverConfig:
         port=int(raw.get("port", 80)),
         username=str(raw.get("username", "")),
         password=str(raw.get("password", "")),
+        use_encryption=bool(raw.get("use_encryption", False)),
+        force_encryption=bool(raw.get("force_encryption", False)),
     )
 
 

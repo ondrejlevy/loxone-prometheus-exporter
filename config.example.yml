@@ -8,12 +8,16 @@ miniservers:
     port: 80                          # WebSocket port (default: 80)
     username: "prometheus"            # Loxone user (overridable: LOXONE_USERNAME)
     password: "your-password-here"    # Loxone password (overridable: LOXONE_PASSWORD)
+    use_encryption: false             # Use wss:// instead of ws:// (default: false)
+    force_encryption: false           # Require encryption, fail if not available (default: false)
+                                      # Note: Miniserver 2 (Gen2) will auto-enable encryption
 
   # Uncomment for multiple Miniservers:
   # - name: "office"
   #   host: "192.168.1.101"
   #   username: "prometheus"
   #   password: "office-password"
+  #   use_encryption: true            # Force encryption for this Miniserver
 
 # HTTP server configuration
 listen_port: 9504                     # Port for /metrics and /healthz (default: 9504)

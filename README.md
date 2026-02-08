@@ -53,6 +53,9 @@ miniservers:
     port: 80                    # WebSocket port (default: 80)
     username: admin
     password: secret
+    use_encryption: false       # Use wss:// instead of ws:// (default: false)
+    force_encryption: false     # Require encryption, fail if not used (default: false)
+                                # Note: Miniserver 2 (Gen2) auto-enables encryption
 
 listen_port: 9504               # HTTP server port (default: 9504)
 listen_address: "0.0.0.0"      # Bind address (default: 0.0.0.0)
@@ -68,6 +71,16 @@ exclude_names:
   - "Debug *"
 include_text_values: false      # Export text controls as info metrics
 ```
+
+### Encryption Options
+
+The exporter supports encrypted WebSocket connections (`wss://`) for secure communication with your Miniserver:
+
+- **`use_encryption`**: Manually enable encrypted connections. Set to `true` to use `wss://` instead of `ws://`.
+- **`force_encryption`**: When enabled, the connection will fail if encryption is not being used. Useful for enforcing security policies.
+- **Auto-detection**: When connecting to a Miniserver 2 (Gen2), the exporter automatically switches to encrypted connections after detecting the Miniserver type from the structure file.
+
+**Important**: Encrypted connections use self-signed certificates on the Miniserver. The exporter automatically accepts these certificates for local network communication.
 
 ### Environment Variables
 
