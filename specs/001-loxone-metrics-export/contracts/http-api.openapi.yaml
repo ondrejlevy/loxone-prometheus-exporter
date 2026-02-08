@@ -1,0 +1,157 @@
+openapi: "3.1.0"
+info:
+  title: Loxone Prometheus Exporter API
+  version: "1.0.0"
+  description: |
+    HTTP endpoints exposed by the Loxone Prometheus Exporter.
+    The exporter serves Prometheus-compatible metrics and a health check endpoint.
+
+servers:
+  - url: "http://localhost:9504"
+    description: Default local listener
+
+paths:
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Prometheus metrics endpoint
+      description: |
+        Returns all discovered Loxone control metrics plus exporter self-health metrics
+        in Prometheus text exposition format (text/plain; version=0.0.4).
+        
+        This endpoint is called by Prometheus during each scrape interval.
+        The custom collector reads the in-memory state snapshot — no WebSocket
+        calls are triggered by scrapes.
+      responses:
+        "200":
+          description: Metrics in Prometheus text exposition format
+          content:
+            "text/plain; version=0.0.4; charset=utf-8":
+              schema:
+                type: string
+              examples:
+                typical:
+                  summary: Typical scrape output
+                  value: |
+                    # HELP loxone_control_value Current numeric value of a control state
+                    # TYPE loxone_control_value gauge
+                    loxone_control_value{miniserver="home",name="Living Room Temperature",room="Living Room",category="Temperature",type="IRoomControllerV2",subcontrol="tempActual"} 22.5
+                    loxone_control_value{miniserver="home",name="Living Room Temperature",room="Living Room",category="Temperature",type="IRoomControllerV2",subcontrol="tempTarget"} 21.0
+                    loxone_control_value{miniserver="home",name="Kitchen Light",room="Kitchen",category="Lighting",type="Switch",subcontrol="active"} 1.0
+                    # HELP loxone_exporter_connected WebSocket connection status per miniserver
+                    # TYPE loxone_exporter_connected gauge
+                    loxone_exporter_connected{miniserver="home"} 1
+                    # HELP loxone_exporter_last_update_timestamp_seconds Unix timestamp of last value event
+                    # TYPE loxone_exporter_last_update_timestamp_seconds gauge
+                    loxone_exporter_last_update_timestamp_seconds{miniserver="home"} 1738934567.123
+                    # HELP loxone_exporter_controls_discovered Controls found in structure
+                    # TYPE loxone_exporter_controls_discovered gauge
+                    loxone_exporter_controls_discovered{miniserver="home"} 127
+                    # HELP loxone_exporter_controls_exported Controls exported after filtering
+                    # TYPE loxone_exporter_controls_exported gauge
+                    loxone_exporter_controls_exported{miniserver="home"} 115
+        "500":
+          description: Internal error during metric collection
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Health check endpoint
+      description: |
+        Returns the health status of the exporter. Useful for container orchestration
+        health checks (Docker HEALTHCHECK, Kubernetes liveness probes).
+        
+        Returns 200 if the exporter process is running and can serve metrics.
+        The response body includes per-miniserver connection status.
+      responses:
+        "200":
+          description: Exporter is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                healthy:
+                  summary: All miniservers connected
+                  value:
+                    status: "healthy"
+                    miniservers:
+                      - name: "home"
+                        connected: true
+                        last_update: 1738934567.123
+                        controls_discovered: 127
+                        controls_exported: 115
+                degraded:
+                  summary: One miniserver disconnected
+                  value:
+                    status: "degraded"
+                    miniservers:
+                      - name: "home"
+                        connected: true
+                        last_update: 1738934567.123
+                        controls_discovered: 127
+                        controls_exported: 115
+                      - name: "office"
+                        connected: false
+                        last_update: 0
+                        controls_discovered: 0
+                        controls_exported: 0
+        "503":
+          description: Exporter is unhealthy (no miniservers connected)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                unhealthy:
+                  value:
+                    status: "unhealthy"
+                    miniservers:
+                      - name: "home"
+                        connected: false
+                        last_update: 0
+                        controls_discovered: 0
+                        controls_exported: 0
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, miniservers]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: |
+            - healthy: all miniservers connected
+            - degraded: at least one miniserver connected, at least one disconnected
+            - unhealthy: no miniservers connected
+        miniservers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MiniserverHealth"
+
+    MiniserverHealth:
+      type: object
+      required: [name, connected, last_update, controls_discovered, controls_exported]
+      properties:
+        name:
+          type: string
+          description: User-defined miniserver label
+        connected:
+          type: boolean
+          description: WebSocket connection is active
+        last_update:
+          type: number
+          format: double
+          description: Unix timestamp of last received value event (0 if never connected)
+        controls_discovered:
+          type: integer
+          description: Number of controls found in LoxAPP3.json
+        controls_exported:
+          type: integer
+          description: Number of controls exported (after filter exclusions)

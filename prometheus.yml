@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "loxone"
+    static_configs:
+      - targets: ["exporter:9504"]
+    scrape_interval: 15s
+    scrape_timeout: 10s

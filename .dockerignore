@@ -1,0 +1,48 @@
+# Git
+.git/
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+tests/
+
+# Docs / specs
+specs/
+.specify/
+.github/
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Config (injected at runtime)
+config.yml
+config.yaml
+prometheus.yml
+
+# OS
+.DS_Store
+Thumbs.db

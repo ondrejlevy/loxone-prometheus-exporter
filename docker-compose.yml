@@ -1,0 +1,51 @@
+services:
+  exporter:
+    build:
+      context: .
+      args:
+        VERSION: "0.1.0"
+        COMMIT: "${GIT_COMMIT:-dev}"
+        BUILD_DATE: "${BUILD_DATE:-unknown}"
+    container_name: loxone-exporter
+    ports:
+      - "9504:9504"
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+    environment:
+      - LOXONE_HOST
+      - LOXONE_USERNAME
+      - LOXONE_PASSWORD
+      - LOXONE_NAME
+      - LOXONE_PORT
+      - LOXONE_LISTEN_PORT
+      - LOXONE_LOG_LEVEL
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: loxone-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - exporter
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: loxone-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  grafana-data:

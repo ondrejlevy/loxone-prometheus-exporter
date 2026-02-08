@@ -1,0 +1,32 @@
+# Loxone Prometheus Exporter Configuration
+# See contracts/config-schema.md for full reference.
+
+# Required: List of Miniserver connections
+miniservers:
+  - name: "home"                      # Unique label → Prometheus `miniserver` label
+    host: "192.168.1.100"             # IP or hostname of the Miniserver
+    port: 80                          # WebSocket port (default: 80)
+    username: "prometheus"            # Loxone user (overridable: LOXONE_USERNAME)
+    password: "your-password-here"    # Loxone password (overridable: LOXONE_PASSWORD)
+
+  # Uncomment for multiple Miniservers:
+  # - name: "office"
+  #   host: "192.168.1.101"
+  #   username: "prometheus"
+  #   password: "office-password"
+
+# HTTP server configuration
+listen_port: 9504                     # Port for /metrics and /healthz (default: 9504)
+listen_address: "0.0.0.0"            # Bind address (default: 0.0.0.0)
+
+# Logging configuration
+log_level: "info"                     # debug, info, warning, error (default: info)
+log_format: "json"                    # json or text (default: json)
+
+# Filtering — exclude controls from metrics export
+exclude_rooms: []                     # Room names to exclude, e.g. ["Test Room", "Utility"]
+exclude_types: []                     # Control types to exclude, e.g. ["Pushbutton", "Webpage"]
+exclude_names: []                     # Glob patterns to exclude, e.g. ["Test*", "Debug_*"]
+
+# Text control handling
+include_text_values: false            # Export text-only controls as info metrics (default: false)
