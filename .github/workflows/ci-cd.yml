@@ -45,21 +45,9 @@ jobs:
         run: |
           mypy src/
 
-      - name: Run unit tests
+      - name: Run all tests with coverage
         run: |
-          pytest tests/unit/ -v --cov=loxone_exporter --cov-report=xml --cov-report=term
-
-      - name: Run contract tests
-        run: |
-          pytest tests/contract/ -v
-
-      - name: Run integration tests
-        run: |
-          pytest tests/integration/ -v
-
-      - name: Run performance tests
-        run: |
-          pytest tests/performance/ -v
+          pytest tests/ -v --cov=loxone_exporter --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'

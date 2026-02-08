@@ -271,6 +271,161 @@ class TestAuthenticationFailure:
             await authenticate(ws, "admin", "secret")
 
 
+class TestHashAlgorithmVariants:
+    """Test different hash algorithm support in token auth."""
+
+    async def test_sha1_hash_algorithm(self) -> None:
+        """Test that SHA1 hash algorithm is correctly handled."""
+        from loxone_exporter.loxone_auth import authenticate
+
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getPublicKey",
+                        "value": _SAMPLE_RSA_PUB_PEM,
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/keyexchange",
+                        "value": "ok",
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getkey2/admin",
+                        "value": {
+                            "key": "aa" * 32,
+                            "salt": "bb" * 16,
+                            "hashAlg": "SHA1",  # Test SHA1
+                        },
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/gettoken",
+                        "value": {
+                            "token": "test-token",
+                            "key": "cc" * 16,
+                            "validUntil": 9999999999,
+                            "tokenRights": 2,
+                            "unsecurePass": False,
+                        },
+                        "Code": "200",
+                    }
+                }),
+            ]
+        )
+
+        result = await authenticate(ws, "admin", "secret")
+        assert result is True
+
+    async def test_unknown_hash_algorithm_defaults_to_sha256(self) -> None:
+        """Test that unknown hash algorithm defaults to SHA256."""
+        from loxone_exporter.loxone_auth import authenticate
+
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getPublicKey",
+                        "value": _SAMPLE_RSA_PUB_PEM,
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/keyexchange",
+                        "value": "ok",
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getkey2/admin",
+                        "value": {
+                            "key": "aa" * 32,
+                            "salt": "bb" * 16,
+                            "hashAlg": "UNKNOWN_ALG",  # Unknown algorithm
+                        },
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/gettoken",
+                        "value": {
+                            "token": "test-token",
+                            "key": "cc" * 16,
+                            "validUntil": 9999999999,
+                            "tokenRights": 2,
+                            "unsecurePass": False,
+                        },
+                        "Code": "200",
+                    }
+                }),
+            ]
+        )
+
+        result = await authenticate(ws, "admin", "secret")
+        assert result is True
+
+
+class TestTokenResponseVariants:
+    """Test different formats of token response."""
+
+    async def test_token_value_as_string(self) -> None:
+        """Test that non-dict token value is handled correctly."""
+        from loxone_exporter.loxone_auth import authenticate
+
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getPublicKey",
+                        "value": _SAMPLE_RSA_PUB_PEM,
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/keyexchange",
+                        "value": "ok",
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getkey2/admin",
+                        "value": {
+                            "key": "aa" * 32,
+                            "salt": "bb" * 16,
+                            "hashAlg": "SHA256",
+                        },
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/gettoken",
+                        "value": "simple-token-string",  # String instead of dict
+                        "Code": "200",
+                    }
+                }),
+            ]
+        )
+
+        result = await authenticate(ws, "admin", "secret")
+        assert result is True
+
+
 # A real RSA-2048 public key for testing (not a secret — test-only)
 _SAMPLE_RSA_PUB_PEM = (
     "-----BEGIN PUBLIC KEY-----\n"
