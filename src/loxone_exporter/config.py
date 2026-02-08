@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,9 @@ class ConfigError(Exception):
 
 _VALID_LOG_LEVELS = {"debug", "info", "warning", "error"}
 _VALID_LOG_FORMATS = {"json", "text"}
+_HOSTNAME_RE = re.compile(
+    r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$"
+)
 
 
 @dataclass(frozen=True)
@@ -49,12 +54,34 @@ def _validate_port(value: int, field_name: str) -> None:
         raise ConfigError(f"{field_name} must be between 1 and 65535, got {value}")
 
 
+def _validate_host(host: str, context: str) -> None:
+    """Validate that host is a valid IP address or hostname."""
+    try:
+        ipaddress.ip_address(host)
+        return
+    except ValueError:
+        pass
+    if not _HOSTNAME_RE.match(host):
+        raise ConfigError(f"{context}: invalid host {host!r} — must be a valid IP or hostname")
+
+
+def _validate_listen_address(address: str) -> None:
+    """Validate listen_address is a valid bind address (IP or 0.0.0.0)."""
+    try:
+        ipaddress.ip_address(address)
+    except ValueError:
+        raise ConfigError(
+            f"listen_address must be a valid IP address, got {address!r}"
+        ) from None
+
+
 def _validate_config(config: ExporterConfig) -> None:
     """Validate the fully assembled config and raise ConfigError on problems."""
     if not config.miniservers:
         raise ConfigError("At least one miniserver must be configured")
 
     _validate_port(config.listen_port, "listen_port")
+    _validate_listen_address(config.listen_address)
 
     if config.log_level not in _VALID_LOG_LEVELS:
         raise ConfigError(
@@ -69,6 +96,7 @@ def _validate_config(config: ExporterConfig) -> None:
     for ms in config.miniservers:
         if not ms.host:
             raise ConfigError(f"Miniserver {ms.name!r}: host must not be empty")
+        _validate_host(ms.host, f"Miniserver {ms.name!r}")
         if not ms.username:
             raise ConfigError(f"Miniserver {ms.name!r}: username must not be empty")
         if not ms.password:
@@ -90,6 +118,16 @@ def _build_ms_config(raw: dict[str, Any]) -> MiniserverConfig:
         username=str(raw.get("username", "")),
         password=str(raw.get("password", "")),
     )
+
+
+def _safe_int(value: str, field_name: str) -> int:
+    """Safely convert a string to int, raising ConfigError on failure."""
+    try:
+        return int(value)
+    except ValueError:
+        raise ConfigError(
+            f"{field_name} must be a valid integer, got {value!r}"
+        ) from None
 
 
 def _apply_env_overrides(
@@ -116,7 +154,7 @@ def _apply_env_overrides(
     if env_pass:
         ms0["password"] = env_pass
     if env_port:
-        ms0["port"] = int(env_port)
+        ms0["port"] = _safe_int(env_port, "LOXONE_PORT")
     if env_name:
         ms0["name"] = env_name
     elif "name" not in ms0 or not ms0["name"]:
@@ -124,7 +162,7 @@ def _apply_env_overrides(
         ms0["name"] = ms0.get("host", "")
 
     if env_listen_port:
-        raw_config["listen_port"] = int(env_listen_port)
+        raw_config["listen_port"] = _safe_int(env_listen_port, "LOXONE_LISTEN_PORT")
     if env_log_level:
         raw_config["log_level"] = env_log_level
 

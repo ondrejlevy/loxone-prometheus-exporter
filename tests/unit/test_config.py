@@ -381,3 +381,101 @@ class TestValidation:
         config = load_config(None)
         assert len(config.miniservers) == 1
         assert config.miniservers[0].name == "test"
+
+
+class TestHostValidation:
+    """Tests for host and listen_address validation (Q2, Q3)."""
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_valid_ip_address(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {"miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}]}
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].host == "10.0.0.1"
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_valid_hostname(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {
+            "miniservers": [
+                {"name": "t", "host": "my-server.local", "username": "u", "password": "p"}
+            ],
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].host == "my-server.local"
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_invalid_host_rejected(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigError, load_config
+
+        cfg = {
+            "miniservers": [
+                {"name": "t", "host": "not valid!!", "username": "u", "password": "p"}
+            ],
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        with pytest.raises(ConfigError, match=r"invalid host"):
+            load_config(str(p))
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_invalid_listen_address_rejected(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigError, load_config
+
+        cfg = {
+            "miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}],
+            "listen_address": "not-an-ip",
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        with pytest.raises(ConfigError, match=r"listen_address must be a valid IP"):
+            load_config(str(p))
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_valid_listen_address_ipv6(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {
+            "miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}],
+            "listen_address": "::1",
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.listen_address == "::1"
+
+
+class TestSafeIntParsing:
+    """Tests for safe int parsing of env variables (Q4)."""
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_invalid_port_env_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from loxone_exporter.config import ConfigError, load_config
+
+        cfg = {"miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}]}
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        monkeypatch.setenv("LOXONE_PORT", "abc")
+        with pytest.raises(ConfigError, match=r"LOXONE_PORT must be a valid integer"):
+            load_config(str(p))
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_invalid_listen_port_env_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from loxone_exporter.config import ConfigError, load_config
+
+        cfg = {"miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}]}
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        monkeypatch.setenv("LOXONE_LISTEN_PORT", "xyz")
+        with pytest.raises(ConfigError, match=r"LOXONE_LISTEN_PORT must be a valid integer"):
+            load_config(str(p))

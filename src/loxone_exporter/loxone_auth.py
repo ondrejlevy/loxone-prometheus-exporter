@@ -115,7 +115,7 @@ async def _token_auth(
 
     # Step 5: Request token
     # Generate a unique UUID for this client session
-    client_uuid = "093407a6-1032-43b0-0000-aa3e19f14d12"
+    client_uuid = str(__import__("uuid").uuid4())
     client_name = "loxone-exporter"
     permission = 2  # web access
 
