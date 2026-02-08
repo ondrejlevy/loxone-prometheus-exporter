@@ -94,6 +94,9 @@ class LoxoneClient:
         self._state.miniserver_type = int(structure.get("msInfo", {}).get("miniserverType", 0))
 
         # Check if this is Miniserver 2 (Gen2) and encryption should be used
+        # NOTE: This auto-detection happens after initial connection, so there's a brief
+        # unencrypted period. If the subsequent encrypted connection fails, the standard
+        # exponential backoff retry mechanism will apply (1s → 30s).
         if self._state.miniserver_type == 2 and not self._use_encryption:
             logger.warning(
                 "[%s] Miniserver 2 detected. Encryption should be used for secure communication. "
@@ -192,6 +195,9 @@ class LoxoneClient:
                     import ssl
                     ssl_context = ssl.create_default_context()
                     # Allow self-signed certificates for local Miniserver
+                    # NOTE: This disables certificate verification for local network use.
+                    # For enhanced security, consider implementing certificate pinning
+                    # or fingerprint verification in production deployments.
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
 

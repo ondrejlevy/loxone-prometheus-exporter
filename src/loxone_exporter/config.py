@@ -25,7 +25,15 @@ _HOSTNAME_RE = re.compile(
 
 @dataclass(frozen=True)
 class MiniserverConfig:
-    """Configuration for a single Loxone Miniserver connection."""
+    """Configuration for a single Loxone Miniserver connection.
+    
+    Encryption options:
+    - use_encryption: Manually enable wss:// encrypted connections.
+    - force_encryption: Require encryption and enable it from the start.
+      Setting force_encryption=True implies use_encryption=True.
+    - Auto-detection: When neither option is set, encryption is automatically
+      enabled when Miniserver 2 (Gen2) is detected.
+    """
 
     name: str
     host: str
