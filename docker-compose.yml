@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.2.0
     container_name: loxone-prometheus
     ports:
       - "9090:9090"
@@ -34,14 +34,14 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.1
     container_name: loxone-grafana
     ports:
       - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
     depends_on:
       - prometheus
     restart: unless-stopped

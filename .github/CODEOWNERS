@@ -1,0 +1,13 @@
+# Default owners for everything in the repo
+* @loxone-prometheus-exporter/maintainers
+
+# CI/CD configuration
+.github/ @loxone-prometheus-exporter/maintainers
+
+# Security-sensitive files
+SECURITY.md @loxone-prometheus-exporter/maintainers
+Dockerfile @loxone-prometheus-exporter/maintainers
+docker-compose.yml @loxone-prometheus-exporter/maintainers
+
+# Source code
+src/ @loxone-prometheus-exporter/maintainers

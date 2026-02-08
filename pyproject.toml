@@ -18,7 +18,7 @@ dependencies = [
     "prometheus_client~=0.24",
     "aiohttp~=3.13",
     "PyYAML~=6.0",
-    "pycryptodome~=3.0",
+    "pycryptodome~=3.23",
 ]
 
 [project.optional-dependencies]
@@ -69,10 +69,15 @@ select = [
     "N",    # pep8-naming
     "UP",   # pyupgrade
     "B",    # flake8-bugbear
+    "S",    # flake8-bandit (security)
     "SIM",  # flake8-simplify
     "TCH",  # flake8-type-checking
     "RUF",  # Ruff-specific rules
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S104", "S105", "S106"]  # Allow assert, test passwords, bind-all in tests
+"src/loxone_exporter/config.py" = ["S104"]  # 0.0.0.0 bind is intentional default
 
 [tool.coverage.run]
 source = ["loxone_exporter"]

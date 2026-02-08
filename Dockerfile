@@ -1,13 +1,14 @@
-FROM python:3.13-slim AS builder
+FROM python:3.13-slim@sha256:f41a75c9cee9391c09e0139f7b49d4b1fbb119944571e824592ebcc2f6c1d27b AS builder
 
 WORKDIR /app
 
+COPY requirements.lock .
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:f41a75c9cee9391c09e0139f7b49d4b1fbb119944571e824592ebcc2f6c1d27b
 
 LABEL org.opencontainers.image.title="Loxone Prometheus Exporter" \
       org.opencontainers.image.description="Exports Loxone Miniserver control values as Prometheus metrics" \
