@@ -95,23 +95,15 @@ class LoxoneClient:
 
         # Check if this is Miniserver 2 (Gen2) and encryption should be used
         if self._state.miniserver_type == 2 and not self._use_encryption:
-            if self._config.force_encryption:
-                logger.error(
-                    "[%s] Miniserver 2 detected but not using encryption. "
-                    "force_encryption is enabled, so this connection will be closed.",
-                    self._config.name
-                )
-                raise LoxoneConnectionError("Miniserver 2 requires encrypted connection")
-            else:
-                logger.warning(
-                    "[%s] Miniserver 2 detected. Encryption should be used for secure communication. "
-                    "Reconnecting with encryption enabled...",
-                    self._config.name
-                )
-                self._detected_miniserver_2 = True
-                self._use_encryption = True
-                # Close current connection to trigger reconnect with encryption
-                raise LoxoneConnectionError("Switching to encrypted connection for Miniserver 2")
+            logger.warning(
+                "[%s] Miniserver 2 detected. Encryption should be used for secure communication. "
+                "Reconnecting with encryption enabled...",
+                self._config.name
+            )
+            self._detected_miniserver_2 = True
+            self._use_encryption = True
+            # Close current connection to trigger reconnect with encryption
+            raise LoxoneConnectionError("Switching to encrypted connection for Miniserver 2")
 
         logger.info(
             "[%s] Structure loaded: %d controls, %d rooms, %d categories (Miniserver Type: %d)",
