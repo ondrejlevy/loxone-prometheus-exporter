@@ -344,27 +344,31 @@ class TestValidation:
         with pytest.raises(ConfigError, match=r"(?i)not found"):
             load_config("/path/that/does/not/exist.yml")
 
-    def test_default_config_invalid_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_config_invalid_yaml(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that invalid YAML in default config.yml raises ConfigError."""
         from loxone_exporter.config import ConfigError, load_config
 
         # Change to temp directory
         monkeypatch.chdir(tmp_path)
-        
+
         # Create invalid config.yml in current directory
         p = tmp_path / "config.yml"
         p.write_text(": : : invalid yaml [[[")
-        
+
         with pytest.raises(ConfigError, match=r"(?i)failed to parse config.yml"):
             load_config(None)
 
-    def test_default_config_yaml_loaded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_config_yaml_loaded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that config.yaml is loaded as default when config.yml doesn't exist."""
         from loxone_exporter.config import load_config
 
         # Change to temp directory
         monkeypatch.chdir(tmp_path)
-        
+
         # Create valid config.yaml (not config.yml)
         cfg = {
             "miniservers": [
@@ -373,7 +377,7 @@ class TestValidation:
         }
         p = tmp_path / "config.yaml"
         p.write_text(yaml.dump(cfg))
-        
+
         config = load_config(None)
         assert len(config.miniservers) == 1
         assert config.miniservers[0].name == "test"
