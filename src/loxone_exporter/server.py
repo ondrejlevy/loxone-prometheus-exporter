@@ -83,6 +83,22 @@ async def _healthz_handler(request: web.Request) -> web.Response:
         "miniservers": miniservers,
     }
 
+    # Include OTLP status if exporter is available
+    otlp_exporter = request.app.get("otlp_exporter")
+    if otlp_exporter is not None:
+        from loxone_exporter.otlp_exporter import ExportState
+
+        otlp_status = otlp_exporter.get_status()
+        body["otlp"] = {
+            "state": otlp_status.state.name.lower(),
+            "last_success": otlp_status.last_success_timestamp,
+            "consecutive_failures": otlp_status.consecutive_failures,
+            "last_error": otlp_status.last_error,
+        }
+        # Degrade overall status if OTLP is in FAILED state
+        if otlp_status.state == ExportState.FAILED and status == "healthy":
+            body["status"] = "degraded"
+
     return web.json_response(body, status=http_status)
 
 

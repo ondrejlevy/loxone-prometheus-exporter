@@ -11,6 +11,7 @@ Export [Loxone Miniserver](https://www.loxone.com/) control values as [Prometheu
 - **Resilient** — Exponential backoff reconnection (1 s → 30 s cap), keepalive, structure re-discovery on reconnect.
 - **Prometheus-compliant** — All metrics follow naming conventions with `HELP` / `TYPE` annotations, bounded label cardinality.
 - **Self-health metrics** — `loxone_exporter_connected`, `last_update_timestamp_seconds`, `scrape_duration_seconds`, `build_info`, etc.
+- **OpenTelemetry OTLP export** — Push metrics to any OTLP-compatible collector (Grafana Alloy, OpenTelemetry Collector, Datadog, etc.) via gRPC or HTTP.
 - **Docker-ready** — Multi-stage build, non-root user, healthcheck included.
 
 ## Quickstart
@@ -96,6 +97,38 @@ Environment variables override the **first** Miniserver in the YAML file, or wor
 | `LOXONE_LISTEN_PORT` | HTTP listen port | `9504` |
 | `LOXONE_LOG_LEVEL` | Log level | `info` |
 
+### OpenTelemetry OTLP Export (Optional)
+
+Add an `opentelemetry` section to push metrics to an OTLP collector in parallel with Prometheus scraping:
+
+```yaml
+opentelemetry:
+  enabled: true
+  endpoint: "http://otel-collector:4317"   # gRPC endpoint
+  protocol: grpc                            # grpc | http
+  interval_seconds: 30                      # Export interval (10-300)
+  timeout_seconds: 15                       # Export timeout (5-60, must be < interval)
+  # tls:
+  #   enabled: true
+  #   cert_path: /path/to/ca.crt
+  # auth:
+  #   headers:
+  #     Authorization: "Bearer <token>"
+```
+
+#### OTLP Environment Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `LOXONE_OTLP_ENABLED` | Enable OTLP export | `false` |
+| `LOXONE_OTLP_ENDPOINT` | Collector endpoint URL | — |
+| `LOXONE_OTLP_PROTOCOL` | `grpc` or `http` | `grpc` |
+| `LOXONE_OTLP_INTERVAL` | Export interval (seconds) | `30` |
+| `LOXONE_OTLP_TIMEOUT` | Export timeout (seconds) | `15` |
+| `LOXONE_OTLP_TLS_ENABLED` | Enable TLS | `false` |
+| `LOXONE_OTLP_TLS_CERT_PATH` | CA certificate path | — |
+| `LOXONE_OTLP_AUTH_HEADER_*` | Auth headers (e.g. `LOXONE_OTLP_AUTH_HEADER_AUTHORIZATION`) | — |
+
 ## Metrics Reference
 
 ### Control Metrics
@@ -118,6 +151,18 @@ Environment variables override the **first** Miniserver in the YAML file, or wor
 | `loxone_exporter_scrape_errors_total` | counter | — | Errors during metric generation |
 | `loxone_exporter_build_info` | info | `version`, `commit`, `build_date` | Build metadata |
 
+### OTLP Health Metrics
+
+Available when `opentelemetry.enabled: true`:
+
+| Metric | Type | Description |
+|---|---|---|
+| `loxone_otlp_export_status` | gauge | Export state (0=disabled, 1=idle, 2=exporting, 3=retrying, 4=failed) |
+| `loxone_otlp_last_success_timestamp_seconds` | gauge | Unix timestamp of last successful export |
+| `loxone_otlp_consecutive_failures` | gauge | Number of consecutive export failures |
+| `loxone_otlp_export_duration_seconds` | histogram | Export operation duration |
+| `loxone_otlp_exported_metrics_total` | counter | Total metric families exported |
+
 ### Endpoints
 
 | Path | Description |
@@ -137,12 +182,17 @@ Environment variables override the **first** Miniserver in the YAML file, or wor
                                   │  ┌────────┐  │    HTTP GET
                                   │  │ Health │──┼──► /healthz
                                   │  └────────┘  │
+                                  │  ┌────────┐  │    gRPC/HTTP
+                                  │  │  OTLP  │──┼──► OTLP Collector
+                                  │  │Exporter│  │    (optional)
+                                  │  └────────┘  │
                                   └──────────────┘
 ```
 
 Single asyncio event loop running:
 - **LoxoneClient** per Miniserver (WebSocket → authenticate → subscribe → receive loop)
 - **aiohttp** HTTP server (custom Prometheus collector reads in-memory state)
+- **OTLPExporter** (optional) — periodically pushes metrics to OTLP collector with backoff retry
 
 ## Docker Build
 

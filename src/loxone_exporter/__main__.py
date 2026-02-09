@@ -18,7 +18,16 @@ from prometheus_client import CollectorRegistry
 from loxone_exporter.config import ConfigError, load_config
 from loxone_exporter.logging import setup_logging
 from loxone_exporter.loxone_client import LoxoneClient
-from loxone_exporter.metrics import LoxoneCollector, scrape_errors_total
+from loxone_exporter.metrics import (
+    LoxoneCollector,
+    otlp_consecutive_failures,
+    otlp_export_duration,
+    otlp_export_status,
+    otlp_exported_metrics_total,
+    otlp_last_success_timestamp,
+    scrape_errors_total,
+)
+from loxone_exporter.otlp_exporter import OTLPExporter
 from loxone_exporter.server import create_app, run_http_server
 
 logger = logging.getLogger(__name__)
@@ -60,8 +69,26 @@ async def _run(config_path: str | None) -> None:
     registry.register(collector)
     registry.register(scrape_errors_total)
 
+    # Register OTLP health metrics
+    if config.opentelemetry.enabled:
+        registry.register(otlp_export_status)
+        registry.register(otlp_last_success_timestamp)
+        registry.register(otlp_consecutive_failures)
+        registry.register(otlp_export_duration)
+        registry.register(otlp_exported_metrics_total)
+
     # Create HTTP app
     app = create_app(config, states=states, registry=registry)
+
+    # Create OTLP exporter if enabled
+    otlp_exporter: OTLPExporter | None = None
+    if config.opentelemetry.enabled:
+        otlp_exporter = OTLPExporter(config.opentelemetry, registry)
+        app["otlp_exporter"] = otlp_exporter
+        logger.info("OTLP export enabled: %s → %s",
+                     config.opentelemetry.protocol, config.opentelemetry.endpoint)
+    else:
+        logger.info("OTLP export disabled")
 
     # Set up signal handlers for graceful shutdown
     loop = asyncio.get_running_loop()
@@ -83,10 +110,26 @@ async def _run(config_path: str | None) -> None:
         # Start HTTP server
         tg.create_task(run_http_server(app, config))
 
+        # Start OTLP exporter if enabled
+        if otlp_exporter is not None:
+            async def _run_otlp(exporter: OTLPExporter) -> None:
+                await exporter.start()
+                try:
+                    # Keep running until cancelled
+                    while True:
+                        await asyncio.sleep(3600)
+                except asyncio.CancelledError:
+                    await exporter.stop()
+                    raise
+
+            tg.create_task(_run_otlp(otlp_exporter))
+
         # Wait for shutdown signal, then cancel the group
         async def _wait_for_shutdown() -> None:
             await shutdown_event.wait()
             logger.info("Shutting down gracefully...")
+            if otlp_exporter is not None:
+                await otlp_exporter.stop()
             raise asyncio.CancelledError()
 
         tg.create_task(_wait_for_shutdown())

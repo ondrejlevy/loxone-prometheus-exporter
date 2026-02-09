@@ -16,11 +16,43 @@ class ConfigError(Exception):
     """Raised when configuration is invalid or missing."""
 
 
+class ConfigurationError(ConfigError):
+    """Raised when OpenTelemetry configuration is invalid."""
+
+
 _VALID_LOG_LEVELS = {"debug", "info", "warning", "error"}
 _VALID_LOG_FORMATS = {"json", "text"}
 _HOSTNAME_RE = re.compile(
     r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$"
 )
+
+
+@dataclass(frozen=True)
+class TLSConfig:
+    """TLS configuration for OTLP connection."""
+
+    enabled: bool = False
+    cert_path: str | None = None
+
+
+@dataclass(frozen=True)
+class AuthConfig:
+    """Authentication configuration for OTLP connection."""
+
+    headers: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class OTLPConfiguration:
+    """Configuration for OTLP export behavior."""
+
+    enabled: bool = False
+    endpoint: str = ""
+    protocol: str = "grpc"
+    interval_seconds: int = 30
+    timeout_seconds: int = 15
+    tls_config: TLSConfig = field(default_factory=TLSConfig)
+    auth_config: AuthConfig = field(default_factory=AuthConfig)
 
 
 @dataclass(frozen=True)
@@ -57,6 +89,7 @@ class ExporterConfig:
     exclude_types: list[str] = field(default_factory=list)
     exclude_names: list[str] = field(default_factory=list)
     include_text_values: bool = False
+    opentelemetry: OTLPConfiguration = field(default_factory=OTLPConfiguration)
 
 
 def _validate_port(value: int, field_name: str) -> None:
@@ -140,6 +173,174 @@ def _safe_int(value: str, field_name: str) -> int:
         raise ConfigError(
             f"{field_name} must be a valid integer, got {value!r}"
         ) from None
+
+
+def _validate_otlp_config(otlp: OTLPConfiguration) -> None:
+    """Validate OTLP configuration. Raises ConfigurationError on problems.
+
+    Only validates when enabled=true. When disabled, skips all checks.
+    """
+    # VR-001: enabled must be bool (already enforced by dataclass type)
+    if not isinstance(otlp.enabled, bool):
+        raise ConfigurationError(
+            "Field 'opentelemetry.enabled' must be a boolean (true/false)"
+        )
+
+    if not otlp.enabled:
+        return  # No further validation needed when disabled
+
+    # VR-002: endpoint required when enabled
+    if not otlp.endpoint:
+        raise ConfigurationError(
+            "Field 'opentelemetry.endpoint' is required when OTLP export is enabled"
+        )
+
+    # VR-003: endpoint must be valid URL with http/https
+    from urllib.parse import urlparse
+
+    parsed = urlparse(otlp.endpoint)
+    if parsed.scheme not in ("http", "https"):
+        raise ConfigurationError(
+            f"Field 'opentelemetry.endpoint' must be a valid URL with http:// or "
+            f"https:// scheme (got: '{otlp.endpoint}')"
+        )
+
+    # VR-004: port must be 1-65535
+    if parsed.port is not None and (parsed.port < 1 or parsed.port > 65535):
+        raise ConfigurationError(
+            f"Endpoint port must be between 1 and 65535 (got: {parsed.port})"
+        )
+
+    # VR-005: protocol must be grpc or http
+    if otlp.protocol not in ("grpc", "http"):
+        raise ConfigurationError(
+            f"Field 'opentelemetry.protocol' must be 'grpc' or 'http' (got: '{otlp.protocol}')"
+        )
+
+    # VR-006: interval_seconds must be 10-300
+    if not isinstance(otlp.interval_seconds, int) or not (10 <= otlp.interval_seconds <= 300):
+        raise ConfigurationError(
+            f"Field 'opentelemetry.interval_seconds' must be an integer between "
+            f"10 and 300 (got: {otlp.interval_seconds})"
+        )
+
+    # VR-007: timeout_seconds must be 5-60
+    if not isinstance(otlp.timeout_seconds, int) or not (5 <= otlp.timeout_seconds <= 60):
+        raise ConfigurationError(
+            f"Field 'opentelemetry.timeout_seconds' must be an integer between "
+            f"5 and 60 (got: {otlp.timeout_seconds})"
+        )
+
+    # VR-008: timeout < interval
+    if otlp.timeout_seconds >= otlp.interval_seconds:
+        raise ConfigurationError(
+            f"Field 'opentelemetry.timeout_seconds' ({otlp.timeout_seconds}) must be "
+            f"less than interval_seconds ({otlp.interval_seconds})"
+        )
+
+    # VR-009: TLS cert_path required when TLS enabled
+    if otlp.tls_config.enabled and not otlp.tls_config.cert_path:
+        raise ConfigurationError(
+            "Field 'opentelemetry.tls.cert_path' is required when TLS is enabled"
+        )
+
+    # VR-010: TLS cert_path must exist and be readable
+    if otlp.tls_config.cert_path:
+        cert = Path(otlp.tls_config.cert_path)
+        if not cert.exists() or not cert.is_file():
+            raise ConfigurationError(
+                f"TLS certificate file not found or not readable: {otlp.tls_config.cert_path}"
+            )
+
+    # VR-011: auth.headers must be dict or None
+    if otlp.auth_config.headers is not None and not isinstance(otlp.auth_config.headers, dict):
+        raise ConfigurationError(
+            f"Field 'opentelemetry.auth.headers' must be a dictionary or null "
+            f"(got: {type(otlp.auth_config.headers).__name__})"
+        )
+
+
+def _build_otlp_config(raw: dict[str, Any]) -> OTLPConfiguration:
+    """Build OTLPConfiguration from raw YAML dict."""
+    if not raw:
+        return OTLPConfiguration()
+
+    tls_raw = raw.get("tls", {})
+    if not isinstance(tls_raw, dict):
+        tls_raw = {}
+
+    auth_raw = raw.get("auth", {})
+    if not isinstance(auth_raw, dict):
+        auth_raw = {}
+
+    tls_config = TLSConfig(
+        enabled=bool(tls_raw.get("enabled", False)),
+        cert_path=tls_raw.get("cert_path"),
+    )
+
+    auth_headers = auth_raw.get("headers")
+    auth_config = AuthConfig(
+        headers=dict(auth_headers) if isinstance(auth_headers, dict) else None,
+    )
+
+    return OTLPConfiguration(
+        enabled=bool(raw.get("enabled", False)),
+        endpoint=str(raw.get("endpoint", "")),
+        protocol=str(raw.get("protocol", "grpc")),
+        interval_seconds=int(raw.get("interval_seconds", 30)),
+        timeout_seconds=int(raw.get("timeout_seconds", 15)),
+        tls_config=tls_config,
+        auth_config=auth_config,
+    )
+
+
+def _apply_otlp_env_overrides(raw_otlp: dict[str, Any]) -> dict[str, Any]:
+    """Apply LOXONE_OTLP_* environment variable overrides onto the raw OTLP config."""
+    env_enabled = os.environ.get("LOXONE_OTLP_ENABLED")
+    if env_enabled is not None:
+        raw_otlp["enabled"] = env_enabled.lower() in ("true", "1", "yes")
+
+    env_endpoint = os.environ.get("LOXONE_OTLP_ENDPOINT")
+    if env_endpoint:
+        raw_otlp["endpoint"] = env_endpoint
+
+    env_protocol = os.environ.get("LOXONE_OTLP_PROTOCOL")
+    if env_protocol:
+        raw_otlp["protocol"] = env_protocol
+
+    env_interval = os.environ.get("LOXONE_OTLP_INTERVAL")
+    if env_interval:
+        raw_otlp["interval_seconds"] = _safe_int(env_interval, "LOXONE_OTLP_INTERVAL")
+
+    env_timeout = os.environ.get("LOXONE_OTLP_TIMEOUT")
+    if env_timeout:
+        raw_otlp["timeout_seconds"] = _safe_int(env_timeout, "LOXONE_OTLP_TIMEOUT")
+
+    env_tls = os.environ.get("LOXONE_OTLP_TLS_ENABLED")
+    if env_tls is not None:
+        if "tls" not in raw_otlp:
+            raw_otlp["tls"] = {}
+        raw_otlp["tls"]["enabled"] = env_tls.lower() in ("true", "1", "yes")
+
+    env_cert = os.environ.get("LOXONE_OTLP_TLS_CERT_PATH")
+    if env_cert:
+        if "tls" not in raw_otlp:
+            raw_otlp["tls"] = {}
+        raw_otlp["tls"]["cert_path"] = env_cert
+
+    # Handle LOXONE_OTLP_AUTH_HEADER_* env vars
+    for key, value in os.environ.items():
+        if key.startswith("LOXONE_OTLP_AUTH_HEADER_"):
+            header_name = key[len("LOXONE_OTLP_AUTH_HEADER_"):]
+            if header_name:
+                if "auth" not in raw_otlp:
+                    raw_otlp["auth"] = {}
+                if "headers" not in raw_otlp["auth"] or raw_otlp["auth"]["headers"] is None:
+                    raw_otlp["auth"]["headers"] = {}
+                # Convert env var name to proper header: AUTHORIZATION → Authorization
+                raw_otlp["auth"]["headers"][header_name.replace("_", "-").title()] = value
+
+    return raw_otlp
 
 
 def _apply_env_overrides(
@@ -239,6 +440,13 @@ def load_config(path: str | None) -> ExporterConfig:
             "No valid miniserver configuration found. Each miniserver needs at least a host."
         )
 
+    # Build OTLP configuration
+    raw_otlp = raw.get("opentelemetry", {})
+    if not isinstance(raw_otlp, dict):
+        raw_otlp = {}
+    raw_otlp = _apply_otlp_env_overrides(raw_otlp)
+    otlp_config = _build_otlp_config(raw_otlp)
+
     config = ExporterConfig(
         miniservers=tuple(ms_configs),
         listen_port=int(raw.get("listen_port", 9504)),
@@ -249,7 +457,12 @@ def load_config(path: str | None) -> ExporterConfig:
         exclude_types=list(raw.get("exclude_types", [])),
         exclude_names=list(raw.get("exclude_names", [])),
         include_text_values=bool(raw.get("include_text_values", False)),
+        opentelemetry=otlp_config,
     )
 
     _validate_config(config)
+
+    # Validate OTLP config — fails startup if invalid when enabled
+    _validate_otlp_config(config.opentelemetry)
+
     return config

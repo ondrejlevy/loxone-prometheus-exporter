@@ -8,3 +8,9 @@ scrape_configs:
       - targets: ["exporter:9504"]
     scrape_interval: 15s
     scrape_timeout: 10s
+
+  # Scrape OTLP Collector's Prometheus exporter (when using docker-compose.override.yml)
+  # - job_name: "otel-collector"
+  #   static_configs:
+  #     - targets: ["otel-collector:8889"]
+  #   scrape_interval: 15s

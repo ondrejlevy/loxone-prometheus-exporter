@@ -1,0 +1,45 @@
+# OpenTelemetry Collector configuration
+#
+# This configuration receives OTLP metrics from the Loxone exporter
+# and exports them to Prometheus (for scraping) and optionally to
+# other backends.
+#
+# Docs: https://opentelemetry.io/docs/collector/configuration/
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+exporters:
+  # Expose received metrics as Prometheus endpoint
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: ""
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Uncomment to forward to another OTLP backend
+  # otlp:
+  #   endpoint: "your-backend:4317"
+  #   tls:
+  #     insecure: true
+
+  # Debug exporter (logs received data)
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus, debug]

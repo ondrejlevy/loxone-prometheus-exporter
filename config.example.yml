@@ -34,3 +34,19 @@ exclude_names: []                     # Glob patterns to exclude, e.g. ["Test*",
 
 # Text control handling
 include_text_values: false            # Export text-only controls as info metrics (default: false)
+
+# OpenTelemetry OTLP export (optional)
+# Pushes metrics to an OTLP collector alongside Prometheus scraping.
+# opentelemetry:
+#   enabled: false                     # Enable/disable OTLP export (default: false)
+#   endpoint: "http://localhost:4317"  # OTLP collector URL (required if enabled)
+#   protocol: grpc                     # 'grpc' or 'http' (default: grpc)
+#   interval_seconds: 30               # Export interval in seconds 10-300 (default: 30)
+#   timeout_seconds: 15                # Export timeout in seconds 5-60 (default: 15)
+#   tls:
+#     enabled: false                   # Enable TLS (default: false)
+#     cert_path: null                  # Path to CA certificate file
+#   auth:
+#     headers:                         # Authentication headers (optional)
+#       Authorization: "Bearer token"
+#       X-API-Key: "your-key"

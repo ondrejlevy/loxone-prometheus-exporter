@@ -410,3 +410,122 @@ class TestConcurrentScrape:
 
         statuses = await asyncio.gather(*[fetch_status() for _ in range(10)])
         assert all(s == 200 for s in statuses), f"Non-200 statuses: {statuses}"
+
+
+# ── T055: OTLP Health Metrics Naming Contract Tests ──────────────────
+
+
+class TestOTLPHealthMetricsContract:
+    """Contract: OTLP health metrics follow naming conventions."""
+
+    _EXPECTED_METRICS = [
+        ("loxone_otlp_export_status", "gauge"),
+        ("loxone_otlp_last_success_timestamp_seconds", "gauge"),
+        ("loxone_otlp_consecutive_failures", "gauge"),
+        ("loxone_otlp_export_duration_seconds", "histogram"),
+        ("loxone_otlp_exported_metrics_total", "counter"),
+    ]
+
+    def test_metric_names_follow_convention(self) -> None:
+        """All OTLP metrics use loxone_otlp_ prefix."""
+        for name, _ in self._EXPECTED_METRICS:
+            assert name.startswith("loxone_otlp_"), f"{name} missing loxone_otlp_ prefix"
+
+    def test_seconds_suffix_for_time_metrics(self) -> None:
+        """Metrics measuring time use _seconds suffix (Prometheus convention)."""
+        time_metrics = [n for n, _ in self._EXPECTED_METRICS if "timestamp" in n or "duration" in n]
+        for name in time_metrics:
+            assert name.endswith("_seconds"), f"{name} should end with _seconds"
+
+    def test_total_suffix_for_counters(self) -> None:
+        """Counter metrics use _total suffix (Prometheus convention)."""
+        counters = [n for n, t in self._EXPECTED_METRICS if t == "counter"]
+        for name in counters:
+            assert name.endswith("_total"), f"Counter {name} should end with _total"
+
+    def test_metric_types_correct(self) -> None:
+        """All 5 OTLP health metrics have correct types."""
+        from loxone_exporter.metrics import (
+            otlp_consecutive_failures,
+            otlp_export_duration,
+            otlp_export_status,
+            otlp_exported_metrics_total,
+            otlp_last_success_timestamp,
+        )
+
+        # Verify they exist and are the right type
+        from prometheus_client import Counter as PCounter
+        from prometheus_client import Gauge as PGauge
+        from prometheus_client import Histogram as PHistogram
+
+        assert isinstance(otlp_export_status, PGauge)
+        assert isinstance(otlp_last_success_timestamp, PGauge)
+        assert isinstance(otlp_consecutive_failures, PGauge)
+        assert isinstance(otlp_export_duration, PHistogram)
+        assert isinstance(otlp_exported_metrics_total, PCounter)
+
+    async def test_healthz_includes_otlp_section(
+        self,
+        aiohttp_client: Any,
+        sample_miniserver_state: MiniserverState,
+        sample_exporter_config: ExporterConfig,
+    ) -> None:
+        """T054: /healthz endpoint includes OTLP status when exporter is active."""
+        from unittest.mock import MagicMock
+
+        from loxone_exporter.otlp_exporter import ExportState, ExportStatus
+        from loxone_exporter.server import create_app
+
+        app = create_app(sample_exporter_config, states=[sample_miniserver_state])
+
+        # Simulate an OTLP exporter
+        mock_exporter = MagicMock()
+        mock_exporter.get_status.return_value = ExportStatus(
+            state=ExportState.IDLE,
+            last_success_timestamp=1700000000.0,
+            consecutive_failures=0,
+        )
+        app["otlp_exporter"] = mock_exporter
+
+        client = await aiohttp_client(app)
+        resp = await client.get("/healthz")
+        assert resp.status == 200
+
+        body = await resp.json()
+        assert "otlp" in body
+        assert body["otlp"]["state"] == "idle"
+        assert body["otlp"]["last_success"] == 1700000000.0
+        assert body["otlp"]["consecutive_failures"] == 0
+
+    async def test_healthz_degrades_when_otlp_failed(
+        self,
+        aiohttp_client: Any,
+        sample_miniserver_state: MiniserverState,
+        sample_exporter_config: ExporterConfig,
+    ) -> None:
+        """When OTLP is FAILED, healthz status should be 'degraded'."""
+        from unittest.mock import MagicMock
+
+        from loxone_exporter.otlp_exporter import ExportState, ExportStatus
+        from loxone_exporter.server import create_app
+
+        app = create_app(sample_exporter_config, states=[sample_miniserver_state])
+
+        mock_exporter = MagicMock()
+        mock_exporter.get_status.return_value = ExportStatus(
+            state=ExportState.FAILED,
+            consecutive_failures=10,
+            last_error="Connection refused",
+        )
+        app["otlp_exporter"] = mock_exporter
+
+        # Ensure miniserver is connected so base status would be "healthy"
+        sample_miniserver_state.connected = True
+
+        client = await aiohttp_client(app)
+        resp = await client.get("/healthz")
+        body = await resp.json()
+
+        assert body["status"] == "degraded"
+        assert body["otlp"]["state"] == "failed"
+        assert body["otlp"]["consecutive_failures"] == 10
