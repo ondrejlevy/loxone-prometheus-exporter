@@ -14,9 +14,11 @@ import hmac
 import json
 import logging
 import secrets
-import types
 import urllib.parse
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import types
 
 from Crypto.Cipher import AES, PKCS1_v1_5
 from Crypto.Hash import HMAC as CRYPTO_HMAC
