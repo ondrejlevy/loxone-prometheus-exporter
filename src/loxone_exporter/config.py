@@ -57,13 +57,23 @@ class OTLPConfiguration:
 
 @dataclass(frozen=True)
 class MiniserverConfig:
-    """Configuration for a single Loxone Miniserver connection."""
+    """Configuration for a single Loxone Miniserver connection.
+    
+    Encryption options:
+    - use_encryption: Manually enable wss:// encrypted connections.
+    - force_encryption: Require encryption and enable it from the start.
+      Setting force_encryption=True implies use_encryption=True.
+    - Auto-detection: When neither option is set, encryption is automatically
+      enabled when Miniserver 2 (Gen2) is detected.
+    """
 
     name: str
     host: str
     port: int = 80
     username: str = ""
     password: str = ""
+    use_encryption: bool = False
+    force_encryption: bool = False
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,8 @@ def _build_ms_config(raw: dict[str, Any]) -> MiniserverConfig:
         port=int(raw.get("port", 80)),
         username=str(raw.get("username", "")),
         password=str(raw.get("password", "")),
+        use_encryption=bool(raw.get("use_encryption", False)),
+        force_encryption=bool(raw.get("force_encryption", False)),
     )
 
 

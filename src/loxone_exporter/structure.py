@@ -18,6 +18,24 @@ _TEXT_ONLY_TYPES = frozenset({
 })
 
 
+def _normalize_loxone_uuid(loxone_uuid: str) -> str:
+    """Normalize Loxone's compact UUID format to standard RFC4122.
+
+    Loxone uses format: 8-4-4-16 (collapses last two groups)
+    Standard UUID: 8-4-4-4-12
+
+    Example: '9febb915-033d-7e3b-01ff504f94a0ef1e' → '9febb915-033d-7e3b-01ff-504f94a0ef1e'
+    """
+    # Remove all hyphens
+    clean = loxone_uuid.replace("-", "")
+    if len(clean) != 32:
+        # Already in correct format or invalid
+        return loxone_uuid
+
+    # Reconstruct as 8-4-4-4-12
+    return f"{clean[:8]}-{clean[8:12]}-{clean[12:16]}-{clean[16:20]}-{clean[20:32]}"
+
+
 @dataclass
 class Room:
     uuid: str
@@ -69,6 +87,7 @@ class MiniserverState:
     name: str
     serial: str = ""
     firmware: str = ""
+    miniserver_type: int = 0
     connected: bool = False
     last_update_ts: float = 0.0
     controls: dict[str, Control] = field(default_factory=dict)
@@ -105,7 +124,7 @@ def _parse_control(
 
     states: dict[str, StateEntry] = {}
     for state_name, state_uuid in raw_states.items():
-        state_uuid_str = str(state_uuid)
+        state_uuid_str = _normalize_loxone_uuid(str(state_uuid))
         is_digital = is_digital_type and state_name in {"active", "value"}
         entry = StateEntry(
             state_uuid=state_uuid_str,

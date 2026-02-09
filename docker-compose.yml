@@ -11,14 +11,7 @@ services:
       - "9504:9504"
     volumes:
       - ./config.yml:/app/config.yml:ro
-    environment:
-      - LOXONE_HOST
-      - LOXONE_USERNAME
-      - LOXONE_PASSWORD
-      - LOXONE_NAME
-      - LOXONE_PORT
-      - LOXONE_LISTEN_PORT
-      - LOXONE_LOG_LEVEL
+
     restart: unless-stopped
 
   prometheus:

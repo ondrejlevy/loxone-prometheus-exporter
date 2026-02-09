@@ -157,11 +157,13 @@ class TestEnvOverrides:
         assert ms.password == "pass123"
 
     def test_env_only_name_defaults_to_host(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """When LOXONE_NAME is not set, name defaults to LOXONE_HOST value."""
         from loxone_exporter.config import load_config
 
+        # Change to temp dir to avoid loading default config.yml
+        monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("LOXONE_HOST", "192.168.1.50")
         monkeypatch.setenv("LOXONE_USERNAME", "prom")
         monkeypatch.setenv("LOXONE_PASSWORD", "pass123")
@@ -281,9 +283,11 @@ class TestValidation:
         with pytest.raises(ConfigError, match=r"(?i)miniserver"):
             load_config(str(p))
 
-    def test_no_config_no_env(self) -> None:
+    def test_no_config_no_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         from loxone_exporter.config import ConfigError, load_config
 
+        # Change to temp dir to avoid loading default config.yml
+        monkeypatch.chdir(tmp_path)
         with pytest.raises(ConfigError):
             load_config(None)
 
@@ -479,6 +483,85 @@ class TestSafeIntParsing:
         monkeypatch.setenv("LOXONE_LISTEN_PORT", "xyz")
         with pytest.raises(ConfigError, match=r"LOXONE_LISTEN_PORT must be a valid integer"):
             load_config(str(p))
+
+
+class TestEncryptionOptions:
+    """Tests for encryption configuration options."""
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_encryption_defaults_to_false(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {"miniservers": [{"name": "t", "host": "10.0.0.1", "username": "u", "password": "p"}]}
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].use_encryption is False
+        assert config.miniservers[0].force_encryption is False
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_use_encryption_enabled(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {
+            "miniservers": [
+                {
+                    "name": "t",
+                    "host": "10.0.0.1",
+                    "username": "u",
+                    "password": "p",
+                    "use_encryption": True,
+                }
+            ]
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].use_encryption is True
+        assert config.miniservers[0].force_encryption is False
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_force_encryption_enabled(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {
+            "miniservers": [
+                {
+                    "name": "t",
+                    "host": "10.0.0.1",
+                    "username": "u",
+                    "password": "p",
+                    "force_encryption": True,
+                }
+            ]
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].use_encryption is False
+        assert config.miniservers[0].force_encryption is True
+
+    @pytest.mark.usefixtures("_clean_env")
+    def test_both_encryption_options_enabled(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        cfg = {
+            "miniservers": [
+                {
+                    "name": "t",
+                    "host": "10.0.0.1",
+                    "username": "u",
+                    "password": "p",
+                    "use_encryption": True,
+                    "force_encryption": True,
+                }
+            ]
+        }
+        p = tmp_path / "config.yml"
+        p.write_text(yaml.dump(cfg))
+        config = load_config(str(p))
+        assert config.miniservers[0].use_encryption is True
+        assert config.miniservers[0].force_encryption is True
 
 
 # ── OTLP Configuration ────────────────────────────────────────────────
