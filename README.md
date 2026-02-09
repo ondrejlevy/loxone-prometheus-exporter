@@ -51,12 +51,13 @@ python -m loxone_exporter --config config.yml
 miniservers:
   - name: home                  # Display name (used in labels)
     host: 192.168.1.100         # Miniserver IP or hostname
-    port: 80                    # WebSocket port (default: 80)
+    port: 80                    # WebSocket port for unencrypted connections (default: 80)
+    ssl_port: 443               # WebSocket port for encrypted connections (default: 443)
     username: admin
     password: secret
     use_encryption: false       # Use wss:// instead of ws:// (default: false)
     force_encryption: false     # Require encryption, fail if not used (default: false)
-                                # Note: Miniserver 2 (Gen2) auto-enables encryption
+                                # Note: Miniserver 2 (Gen2) auto-enables encryption on ssl_port
 
 listen_port: 9504               # HTTP server port (default: 9504)
 listen_address: "0.0.0.0"      # Bind address (default: 0.0.0.0)
@@ -78,10 +79,13 @@ include_text_values: false      # Export text controls as info metrics
 The exporter supports encrypted WebSocket connections (`wss://`) for secure communication with your Miniserver:
 
 - **`use_encryption`**: Manually enable encrypted connections. Set to `true` to use `wss://` instead of `ws://`.
+- **`ssl_port`**: Port to use for encrypted connections (default: 443). This can be customized if your Miniserver uses a non-standard SSL port.
 - **`force_encryption`**: When enabled, the connection will fail if encryption is not being used. Useful for enforcing security policies.
-- **Auto-detection**: When connecting to a Miniserver 2 (Gen2), the exporter automatically switches to encrypted connections after detecting the Miniserver type from the structure file.
+- **Auto-detection**: When connecting to a Miniserver 2 (Gen2), the exporter automatically switches to encrypted connections on `ssl_port` after detecting the Miniserver type from the structure file.
 
-**Important**: Encrypted connections use self-signed certificates on the Miniserver. The exporter automatically accepts these certificates for local network communication.
+**Important**: 
+- Encrypted connections use self-signed certificates on the Miniserver. The exporter automatically accepts these certificates for local network communication.
+- HTTP API requests (for authentication) always use the `port` value, regardless of encryption settings.
 
 ### Environment Variables
 
@@ -128,6 +132,74 @@ opentelemetry:
 | `LOXONE_OTLP_TLS_ENABLED` | Enable TLS | `false` |
 | `LOXONE_OTLP_TLS_CERT_PATH` | CA certificate path | — |
 | `LOXONE_OTLP_AUTH_HEADER_*` | Auth headers (e.g. `LOXONE_OTLP_AUTH_HEADER_AUTHORIZATION`) | — |
+
+### Direct Export to Grafana Cloud
+
+You can send metrics directly to Grafana Cloud OTLP endpoint without deploying a separate collector. This "quickstart architecture" is suitable for development, testing, or production use when you don't need advanced features like sampling, data enrichment, or routing to multiple backends.
+
+#### 1. Get Grafana Cloud OTLP Credentials
+
+1. Sign in to [Grafana Cloud Portal](https://grafana.com/auth/sign-in/)
+2. Select your stack from the Organization Overview
+3. Click **Configure** on the OpenTelemetry tile
+4. Generate an authentication token and note the following values:
+   - **OTLP Endpoint** (e.g., `https://otlp-gateway-prod-eu-west-0.grafana.net/otlp`)
+   - **Instance ID** (e.g., `123456`)
+   - **API Token** (base64-encoded credentials for Basic auth)
+
+#### 2. Configure the Exporter
+
+Add the following to your `config.yml`:
+
+```yaml
+opentelemetry:
+  enabled: true
+  endpoint: "https://otlp-gateway-prod-eu-west-0.grafana.net/otlp"  # Your Grafana Cloud OTLP endpoint
+  protocol: http                                                      # Grafana Cloud uses HTTP/protobuf
+  interval_seconds: 60                                                # Export every 60 seconds
+  timeout_seconds: 30
+  auth:
+    headers:
+      Authorization: "Basic%20<your-base64-encoded-token>"            # Note: Use %20 for Python compatibility
+```
+
+**Important Notes:**
+
+- **Protocol**: Use `http` (not `grpc`) for Grafana Cloud OTLP endpoints
+- **Authorization Header**: Python requires URL-encoded space — use `Basic%20` instead of `Basic ` (space after "Basic")
+- **Endpoint**: Do **not** append `/v1/metrics` — the exporter handles this automatically
+- **TLS**: HTTPS endpoints work automatically; no additional TLS configuration needed
+- **Resource Attributes**: The exporter automatically sets `service.name=loxone-prometheus-exporter` and `service.version=<version>` for identification in Grafana Cloud
+
+#### 3. Alternative: Environment Variables
+
+```bash
+export LOXONE_OTLP_ENABLED=true
+export LOXONE_OTLP_ENDPOINT="https://otlp-gateway-prod-eu-west-0.grafana.net/otlp"
+export LOXONE_OTLP_PROTOCOL=http
+export LOXONE_OTLP_INTERVAL=60
+export LOXONE_OTLP_TIMEOUT=30
+export LOXONE_OTLP_AUTH_HEADER_AUTHORIZATION="Basic%20<your-base64-encoded-token>"
+
+python -m loxone_exporter --config config.yml
+```
+
+#### 4. Verify in Grafana Cloud
+
+1. Navigate to your Grafana Cloud stack
+2. Go to **Explore** → **Metrics**
+3. Search for metrics starting with `loxone_` (e.g., `loxone_control_value`, `loxone_exporter_connected`)
+4. Alternatively, use **Application Observability** if enabled to see automatic dashboards
+
+#### Troubleshooting
+
+- **401 Unauthorized**: Check that your Authorization header is correctly formatted with `Basic%20` (not `Basic `)
+- **Connection timeout**: Verify the endpoint URL matches your region (e.g., `eu-west-0`, `us-central-0`)
+- **No metrics visible**: Wait 1-2 minutes after first export, then check the OTLP health metrics in `/metrics`:
+  ```
+  loxone_otlp_export_status 1.0           # 1=idle (success), 4=failed
+  loxone_otlp_consecutive_failures 0.0    # Should be 0
+  ```
 
 ## Metrics Reference
 
