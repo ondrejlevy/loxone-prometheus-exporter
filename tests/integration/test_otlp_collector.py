@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
-
 
 # ── T028: Mock OTLP Collector Fixture ─────────────────────────────────
 
@@ -135,9 +134,9 @@ class TestSuccessfulExportFlow:
 
         # Simulate slow OTLP export
         def slow_export(data):
-            from opentelemetry.sdk.metrics.export import MetricExportResult
-
             import time
+
+            from opentelemetry.sdk.metrics.export import MetricExportResult
             time.sleep(0.1)
             return MetricExportResult.SUCCESS
 

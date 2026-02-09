@@ -58,7 +58,7 @@ class OTLPConfiguration:
 @dataclass(frozen=True)
 class MiniserverConfig:
     """Configuration for a single Loxone Miniserver connection.
-    
+
     Encryption options:
     - use_encryption: Manually enable wss:// encrypted connections.
     - force_encryption: Require encryption and enable it from the start.

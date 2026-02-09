@@ -6,7 +6,7 @@ Validates that the HTTP API conforms to contracts/http-api.openapi.yaml.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from loxone_exporter.config import ExporterConfig
@@ -418,7 +418,7 @@ class TestConcurrentScrape:
 class TestOTLPHealthMetricsContract:
     """Contract: OTLP health metrics follow naming conventions."""
 
-    _EXPECTED_METRICS = [
+    _EXPECTED_METRICS: ClassVar[list[tuple[str, str]]] = [
         ("loxone_otlp_export_status", "gauge"),
         ("loxone_otlp_last_success_timestamp_seconds", "gauge"),
         ("loxone_otlp_consecutive_failures", "gauge"),
@@ -445,6 +445,11 @@ class TestOTLPHealthMetricsContract:
 
     def test_metric_types_correct(self) -> None:
         """All 5 OTLP health metrics have correct types."""
+        # Verify they exist and are the right type
+        from prometheus_client import Counter as PCounter
+        from prometheus_client import Gauge as PGauge
+        from prometheus_client import Histogram as PHistogram
+
         from loxone_exporter.metrics import (
             otlp_consecutive_failures,
             otlp_export_duration,
@@ -452,11 +457,6 @@ class TestOTLPHealthMetricsContract:
             otlp_exported_metrics_total,
             otlp_last_success_timestamp,
         )
-
-        # Verify they exist and are the right type
-        from prometheus_client import Counter as PCounter
-        from prometheus_client import Gauge as PGauge
-        from prometheus_client import Histogram as PHistogram
 
         assert isinstance(otlp_export_status, PGauge)
         assert isinstance(otlp_last_success_timestamp, PGauge)

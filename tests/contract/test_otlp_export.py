@@ -11,7 +11,6 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
 from loxone_exporter.otlp_exporter import (
     DataPoint,
     HistogramDataPoint,
-    MetricBatch,
     PrometheusToOTLPBridge,
 )
 
@@ -111,7 +110,7 @@ class TestOTLPFormatCompliance:
         bridge = PrometheusToOTLPBridge(full_registry)
         batch = bridge.convert_metrics()
 
-        ctrl = [m for m in batch.metrics if m.name == "loxone_control_value"][0]
+        ctrl = next(m for m in batch.metrics if m.name == "loxone_control_value")
         dp = ctrl.data_points[0]
         assert isinstance(dp, DataPoint)
 
@@ -128,14 +127,14 @@ class TestOTLPFormatCompliance:
         bridge = PrometheusToOTLPBridge(full_registry)
         batch = bridge.convert_metrics()
 
-        ctrl = [m for m in batch.metrics if m.name == "loxone_control_value"][0]
+        ctrl = next(m for m in batch.metrics if m.name == "loxone_control_value")
         assert ctrl.description == "Current numeric value of a control state"
 
     def test_histogram_buckets_preserved(self, full_registry: CollectorRegistry) -> None:
         bridge = PrometheusToOTLPBridge(full_registry)
         batch = bridge.convert_metrics()
 
-        hist = [m for m in batch.metrics if m.name == "loxone_exporter_scrape_duration_seconds"][0]
+        hist = next(m for m in batch.metrics if m.name == "loxone_exporter_scrape_duration_seconds")
         hdp = hist.data_points[0]
         assert isinstance(hdp, HistogramDataPoint)
         assert hdp.explicit_bounds == [0.001, 0.005, 0.01, 0.05, 0.1]
