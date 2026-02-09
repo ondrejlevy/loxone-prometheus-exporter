@@ -19,6 +19,9 @@ dependencies = [
     "aiohttp~=3.13",
     "PyYAML~=6.0",
     "pycryptodome~=3.23",
+    "opentelemetry-sdk~=1.28",
+    "opentelemetry-exporter-otlp-proto-grpc~=1.28",
+    "opentelemetry-exporter-otlp-proto-http~=1.28",
 ]
 
 [project.optional-dependencies]

@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Input**: User description: "do projektu chceme pridat podporu pro vystup ve formatu opentelemetry. tz to aby aplikace umela posilat metriky na otel collector ktery by byl definovany v konfiguraci. podpora by by mela jit pres nastaveni vypnout"
 
+## Clarifications
+
+### Session 2026-02-09
+
+- Q: Which OTLP protocols should be supported for the initial implementation (gRPC only, HTTP only, or both)? → A: Both gRPC and HTTP with configuration option
+- Q: How should the system handle export overlap when an export takes longer than the export interval? → A: Skip overlapping exports - if an export is still in progress when the next interval triggers, skip that cycle and wait for the next interval
+- Q: Should there be a maximum retry limit or should failed exports retry indefinitely? → A: Maximum retry limit - stop retrying after 10 consecutive failures, log critical error, wait for next scheduled export cycle to reset retry counter
+- Q: How should the system handle invalid OpenTelemetry configuration when enabled=true (fail to start or fall back to Prometheus-only)? → A: Fail to start with clear error message
+- Q: What specific parameters should govern exponential backoff retry behavior (initial delay, max delay, multiplier, max retries)? → A: 1s initial delay, 5min max delay, 2.0 multiplier, 10 max retries
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Enable OpenTelemetry Export (Priority: P1)
@@ -57,11 +67,11 @@ Operators want to verify that OpenTelemetry export is functioning correctly thro
 
 ### Edge Cases
 
-- What happens when the OpenTelemetry collector endpoint is temporarily unavailable? (System should retry with backoff and continue operating)
-- How does the system handle invalid OpenTelemetry configuration? (System should fail to start with clear error message, or fall back to Prometheus-only mode depending on configuration)
-- What happens when both Prometheus scraping and OpenTelemetry push are enabled simultaneously? (Both should work independently - Prometheus pull and OTLP push)
-- How does the system handle authentication failures to the OpenTelemetry collector? (Log authentication errors, retry with backoff, remain operational for Prometheus)
-- What happens when metric export takes longer than the export interval? (Skip the interval and export on next cycle, or queue exports - [NEEDS CLARIFICATION: should exports queue or skip on overlap?])
+- What happens when the OpenTelemetry collector endpoint is temporarily unavailable? (System retries with exponential backoff: 1s initial delay, doubling each retry up to 5min max, stopping after 10 consecutive failures; continues serving Prometheus metrics. After reaching max failures, system enters FAILED state but automatically resets retry counter when the next scheduled export cycle begins, allowing recovery)
+- How does the system handle invalid OpenTelemetry configuration? (System fails to start with clear error message detailing the configuration problem when enabled=true)
+- What happens when both Prometheus scraping and OpenTelemetry push are enabled simultaneously? (Both work independently - Prometheus pull and OTLP push operate concurrently without interference. Prometheus /metrics endpoint maintains <500ms response time even during OTLP export failures)
+- How does the system handle authentication failures to the OpenTelemetry collector? (Treated as export failure: logs authentication errors with sanitized credentials, retries with exponential backoff per retry policy, remains operational for Prometheus)
+- What happens when metric export takes longer than the export interval? (System skips the overlapping export cycle; next export occurs at the following scheduled interval to prevent queue buildup)
 
 ## Requirements *(mandatory)*
 
@@ -77,9 +87,11 @@ Operators want to verify that OpenTelemetry export is functioning correctly thro
 - **FR-008**: System MUST support TLS/SSL connections to OpenTelemetry collectors when configured
 - **FR-009**: System MUST support authentication headers for OpenTelemetry collectors (API keys, tokens)
 - **FR-010**: System MUST provide health metrics indicating OpenTelemetry export status and connection state
-- **FR-011**: System MUST handle both gRPC and HTTP protocols for OTLP as specified in configuration [NEEDS CLARIFICATION: should both gRPC and HTTP protocols be supported, or just one initially?]
+- **FR-011**: System MUST support both gRPC and HTTP protocols for OTLP, selectable via configuration option
 - **FR-012**: System MUST preserve metric metadata (labels, descriptions) when converting from Prometheus format to OTLP format
-- **FR-013**: System MUST use exponential backoff when retrying failed exports to OpenTelemetry collector [NEEDS CLARIFICATION: should there be a maximum retry limit or should it retry indefinitely?]
+- **FR-013**: System MUST use exponential backoff when retrying failed exports: 1 second initial delay, 2.0 multiplier, 5 minute maximum delay, stopping after 10 consecutive failures
+- **FR-014**: System MUST fail to start with a clear, actionable error message if OpenTelemetry configuration is invalid when enabled=true
+- **FR-015**: System MUST skip overlapping export cycles when an export operation exceeds the configured export interval duration
 
 ### Key Entities *(include if feature involves data)*
 
@@ -112,3 +124,6 @@ Operators want to verify that OpenTelemetry export is functioning correctly thro
 - Default export interval is 30 seconds if not specified in configuration
 - Default protocol is gRPC if not specified in configuration
 - TLS is disabled by default and must be explicitly enabled in configuration
+- Retry backoff parameters: initial delay 1s, multiplier 2.0, max delay 5min, max consecutive failures 10
+- Failed exports reset their retry counter when a new scheduled export cycle begins
+- Configuration validation occurs at startup before any connections are established

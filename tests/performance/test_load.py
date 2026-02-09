@@ -198,3 +198,104 @@ class TestPerformance:
         assert durations[-1] < avg * 3, (
             f"Last scrape {durations[-1]:.3f}s >> avg {avg:.3f}s"
         )
+
+
+# ── T062-T064: OTLP Performance Tests ────────────────────────────────
+
+
+class TestOTLPPerformance:
+    """Performance tests for OTLP export with 1000 metrics."""
+
+    def test_conversion_1000_metrics_under_500ms(self) -> None:
+        """T062/T064: Converting 1000 metric families should take <500ms P95."""
+        from prometheus_client import CollectorRegistry, Gauge
+
+        from loxone_exporter.otlp_exporter import PrometheusToOTLPBridge
+
+        registry = CollectorRegistry()
+        for i in range(1000):
+            g = Gauge(f"perf_metric_{i}", f"Perf test {i}", ["room"], registry=registry)
+            g.labels(room=f"room_{i % 10}").set(float(i))
+
+        bridge = PrometheusToOTLPBridge(registry)
+
+        durations: list[float] = []
+        for _ in range(20):
+            start = time.monotonic()
+            batch = bridge.convert_metrics()
+            duration = time.monotonic() - start
+            durations.append(duration)
+
+        durations.sort()
+        p95 = durations[int(len(durations) * 0.95)]
+        assert p95 < 0.5, f"P95 conversion latency {p95:.3f}s exceeds 500ms"
+        assert len(batch.metrics) >= 1000
+
+    def test_sdk_export_1000_metrics(self) -> None:
+        """T062: Full SDK export (mock) with 1000 metrics completes quickly."""
+        from unittest.mock import MagicMock, patch
+
+        from opentelemetry.sdk.metrics.export import MetricExportResult
+        from prometheus_client import CollectorRegistry, Gauge
+
+        from loxone_exporter.config import AuthConfig, OTLPConfiguration, TLSConfig
+        from loxone_exporter.otlp_exporter import OTLPExporter
+
+        registry = CollectorRegistry()
+        for i in range(1000):
+            g = Gauge(f"sdk_perf_{i}", f"SDK perf {i}", registry=registry)
+            g.set(float(i))
+
+        mock_exporter = MagicMock()
+        mock_exporter.export.return_value = MetricExportResult.SUCCESS
+
+        config = OTLPConfiguration(
+            enabled=True, endpoint="http://localhost:4317",
+            protocol="grpc", interval_seconds=30, timeout_seconds=15,
+            tls_config=TLSConfig(), auth_config=AuthConfig(),
+        )
+        with patch(
+            "loxone_exporter.otlp_exporter.create_otlp_exporter",
+            return_value=mock_exporter,
+        ):
+            exporter = OTLPExporter(config, registry)
+
+        batch = exporter._bridge.convert_metrics()
+
+        start = time.monotonic()
+        result = exporter._do_sdk_export(batch)
+        duration = time.monotonic() - start
+
+        assert result == MetricExportResult.SUCCESS
+        assert duration < 2.0, f"SDK export took {duration:.3f}s, expected <2s"
+
+    def test_memory_overhead_under_10mb(self) -> None:
+        """T063: OTLP conversion adds ≤10MB memory overhead."""
+        import tracemalloc
+
+        from prometheus_client import CollectorRegistry, Gauge
+
+        from loxone_exporter.otlp_exporter import PrometheusToOTLPBridge
+
+        registry = CollectorRegistry()
+        for i in range(1000):
+            g = Gauge(f"mem_perf_{i}", f"Mem perf {i}", registry=registry)
+            g.set(float(i))
+
+        bridge = PrometheusToOTLPBridge(registry)
+
+        tracemalloc.start()
+        snapshot1 = tracemalloc.take_snapshot()
+
+        # Convert metrics 10 times to amplify memory usage
+        for _ in range(10):
+            batch = bridge.convert_metrics()
+
+        snapshot2 = tracemalloc.take_snapshot()
+        tracemalloc.stop()
+
+        stats = snapshot2.compare_to(snapshot1, "lineno")
+        total_diff = sum(s.size_diff for s in stats if s.size_diff > 0)
+        mb = total_diff / (1024 * 1024)
+
+        assert mb < 10.0, f"Memory overhead {mb:.1f}MB exceeds 10MB limit"

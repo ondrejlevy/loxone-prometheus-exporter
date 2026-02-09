@@ -479,3 +479,295 @@ class TestSafeIntParsing:
         monkeypatch.setenv("LOXONE_LISTEN_PORT", "xyz")
         with pytest.raises(ConfigError, match=r"LOXONE_LISTEN_PORT must be a valid integer"):
             load_config(str(p))
+
+
+# ── OTLP Configuration ────────────────────────────────────────────────
+
+
+def _make_config_with_otlp(tmp_path: Path, otlp_section: dict[str, Any] | None = None) -> Path:
+    """Helper to create a config file with OTLP section."""
+    cfg: dict[str, Any] = {
+        "miniservers": [
+            {"name": "home", "host": "192.168.1.100", "username": "admin", "password": "secret"}
+        ],
+    }
+    if otlp_section is not None:
+        cfg["opentelemetry"] = otlp_section
+    p = tmp_path / "config.yml"
+    p.write_text(yaml.dump(cfg))
+    return p
+
+
+@pytest.mark.usefixtures("_clean_env")
+class TestOTLPConfigDisabled:
+    """Tests for OTLP config when disabled (default)."""
+
+    def test_default_otlp_disabled(self, config_file: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        config = load_config(str(config_file))
+        assert config.opentelemetry.enabled is False
+
+    def test_explicit_disabled(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {"enabled": False})
+        config = load_config(str(p))
+        assert config.opentelemetry.enabled is False
+        assert config.opentelemetry.endpoint == ""
+
+    def test_disabled_skips_validation(self, tmp_path: Path) -> None:
+        """When disabled, no validation errors even with invalid fields."""
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": False,
+            "endpoint": "ftp://bad",  # Invalid but shouldn't matter
+        })
+        config = load_config(str(p))
+        assert config.opentelemetry.enabled is False
+
+    def test_no_otlp_section(self, config_file: Path) -> None:
+        """Config without opentelemetry section uses defaults."""
+        from loxone_exporter.config import load_config
+
+        config = load_config(str(config_file))
+        assert config.opentelemetry.enabled is False
+        assert config.opentelemetry.protocol == "grpc"
+        assert config.opentelemetry.interval_seconds == 30
+        assert config.opentelemetry.timeout_seconds == 15
+
+
+@pytest.mark.usefixtures("_clean_env")
+class TestOTLPConfigEnabled:
+    """Tests for OTLP config when enabled=true."""
+
+    def test_minimal_enabled(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+        })
+        config = load_config(str(p))
+        assert config.opentelemetry.enabled is True
+        assert config.opentelemetry.endpoint == "http://localhost:4317"
+        assert config.opentelemetry.protocol == "grpc"
+        assert config.opentelemetry.interval_seconds == 30
+
+    def test_full_config(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "https://collector.local:4318",
+            "protocol": "http",
+            "interval_seconds": 60,
+            "timeout_seconds": 30,
+            "tls": {"enabled": True, "cert_path": str(tmp_path / "cert.pem")},
+            "auth": {"headers": {"Authorization": "Bearer token123"}},
+        })
+        # Create cert file for validation
+        (tmp_path / "cert.pem").write_text("fake cert")
+        config = load_config(str(p))
+        assert config.opentelemetry.protocol == "http"
+        assert config.opentelemetry.interval_seconds == 60
+        assert config.opentelemetry.timeout_seconds == 30
+        assert config.opentelemetry.tls_config.enabled is True
+        assert config.opentelemetry.auth_config.headers == {"Authorization": "Bearer token123"}
+
+    def test_http_protocol(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4318",
+            "protocol": "http",
+        })
+        config = load_config(str(p))
+        assert config.opentelemetry.protocol == "http"
+
+
+@pytest.mark.usefixtures("_clean_env")
+class TestOTLPConfigValidation:
+    """Tests for OTLP config validation rules VR-001 through VR-011."""
+
+    def test_vr002_endpoint_required(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {"enabled": True})
+        with pytest.raises(ConfigurationError, match="endpoint.*required"):
+            load_config(str(p))
+
+    def test_vr003_invalid_scheme(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "ftp://localhost:4317",
+        })
+        with pytest.raises(ConfigurationError, match="http:// or https://"):
+            load_config(str(p))
+
+    def test_vr003_missing_scheme(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "localhost:4317",
+        })
+        with pytest.raises(ConfigurationError, match="http:// or https://"):
+            load_config(str(p))
+
+    def test_vr005_invalid_protocol(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "protocol": "TCP",
+        })
+        with pytest.raises(ConfigurationError, match="'grpc' or 'http'"):
+            load_config(str(p))
+
+    def test_vr006_interval_too_low(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "interval_seconds": 5,
+        })
+        with pytest.raises(ConfigurationError, match="interval_seconds.*10 and 300"):
+            load_config(str(p))
+
+    def test_vr006_interval_too_high(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "interval_seconds": 500,
+        })
+        with pytest.raises(ConfigurationError, match="interval_seconds.*10 and 300"):
+            load_config(str(p))
+
+    def test_vr007_timeout_too_low(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "timeout_seconds": 2,
+        })
+        with pytest.raises(ConfigurationError, match="timeout_seconds.*5 and 60"):
+            load_config(str(p))
+
+    def test_vr008_timeout_exceeds_interval(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "interval_seconds": 20,
+            "timeout_seconds": 25,
+        })
+        with pytest.raises(ConfigurationError, match="timeout_seconds.*less than interval"):
+            load_config(str(p))
+
+    def test_vr009_tls_cert_required(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "tls": {"enabled": True},
+        })
+        with pytest.raises(ConfigurationError, match="cert_path.*required.*TLS"):
+            load_config(str(p))
+
+    def test_vr010_cert_file_missing(self, tmp_path: Path) -> None:
+        from loxone_exporter.config import ConfigurationError, load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "tls": {"enabled": True, "cert_path": "/nonexistent/cert.pem"},
+        })
+        with pytest.raises(ConfigurationError, match="not found or not readable"):
+            load_config(str(p))
+
+
+@pytest.mark.usefixtures("_clean_env")
+class TestOTLPEnvOverrides:
+    """Tests for LOXONE_OTLP_* environment variable overrides."""
+
+    def test_env_enables_otlp(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {"enabled": False})
+        monkeypatch.setenv("LOXONE_OTLP_ENABLED", "true")
+        monkeypatch.setenv("LOXONE_OTLP_ENDPOINT", "http://collector:4317")
+        config = load_config(str(p))
+        assert config.opentelemetry.enabled is True
+        assert config.opentelemetry.endpoint == "http://collector:4317"
+
+    def test_env_overrides_protocol(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+            "protocol": "grpc",
+        })
+        monkeypatch.setenv("LOXONE_OTLP_PROTOCOL", "http")
+        config = load_config(str(p))
+        assert config.opentelemetry.protocol == "http"
+
+    def test_env_overrides_interval(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+        })
+        monkeypatch.setenv("LOXONE_OTLP_INTERVAL", "60")
+        config = load_config(str(p))
+        assert config.opentelemetry.interval_seconds == 60
+
+    def test_env_auth_header(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from loxone_exporter.config import load_config
+
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+        })
+        monkeypatch.setenv("LOXONE_OTLP_AUTH_HEADER_AUTHORIZATION", "Bearer mytoken")
+        config = load_config(str(p))
+        assert config.opentelemetry.auth_config.headers is not None
+        assert "Authorization" in config.opentelemetry.auth_config.headers
+
+    def test_env_tls_settings(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from loxone_exporter.config import load_config
+
+        cert = tmp_path / "ca.crt"
+        cert.write_text("fake cert")
+        p = _make_config_with_otlp(tmp_path, {
+            "enabled": True,
+            "endpoint": "http://localhost:4317",
+        })
+        monkeypatch.setenv("LOXONE_OTLP_TLS_ENABLED", "true")
+        monkeypatch.setenv("LOXONE_OTLP_TLS_CERT_PATH", str(cert))
+        config = load_config(str(p))
+        assert config.opentelemetry.tls_config.enabled is True
+        assert config.opentelemetry.tls_config.cert_path == str(cert)

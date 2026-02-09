@@ -12,7 +12,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from prometheus_client import Counter
+from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, Metric
 
 from loxone_exporter import __build_date__, __commit__, __version__
@@ -35,6 +35,41 @@ scrape_errors_total = Counter(
     "loxone_exporter_scrape_errors_total",
     "Total number of errors during metric generation",
     registry=None,  # Don't auto-register; server.py will handle it
+)
+
+# ── OTLP Health Metrics (T043-T047) ───────────────────────────────────
+# These are standard Prometheus metrics (not custom-collector) so they
+# persist across scrapes and can be updated from the OTLP exporter.
+
+otlp_export_status = Gauge(
+    "loxone_otlp_export_status",
+    "OTLP export operational state (0=disabled, 1=idle, 2=exporting, 3=retrying, 4=failed)",
+    registry=None,
+)
+
+otlp_last_success_timestamp = Gauge(
+    "loxone_otlp_last_success_timestamp_seconds",
+    "Unix timestamp of last successful OTLP export",
+    registry=None,
+)
+
+otlp_consecutive_failures = Gauge(
+    "loxone_otlp_consecutive_failures",
+    "Number of consecutive OTLP export failures",
+    registry=None,
+)
+
+otlp_export_duration = Histogram(
+    "loxone_otlp_export_duration_seconds",
+    "Duration of OTLP export operations",
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0],
+    registry=None,
+)
+
+otlp_exported_metrics_total = Counter(
+    "loxone_otlp_exported_metrics_total",
+    "Total number of metric families exported via OTLP",
+    registry=None,
 )
 
 # Labels for loxone_control_value

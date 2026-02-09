@@ -1,0 +1,29 @@
+# Docker Compose override for OpenTelemetry Collector
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+#
+# This adds an OpenTelemetry Collector alongside the exporter.
+# Metrics flow: Loxone → Exporter → OTLP Collector → Prometheus (remote-write)
+
+services:
+  exporter:
+    environment:
+      - LOXONE_OTLP_ENABLED=true
+      - LOXONE_OTLP_ENDPOINT=http://otel-collector:4317
+      - LOXONE_OTLP_PROTOCOL=grpc
+      - LOXONE_OTLP_INTERVAL=30
+    depends_on:
+      - otel-collector
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.0
+    container_name: otel-collector
+    restart: unless-stopped
+    ports:
+      - "4317:4317"    # gRPC receiver
+      - "4318:4318"    # HTTP receiver
+      - "8889:8889"    # Prometheus exporter (collector's own metrics)
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]

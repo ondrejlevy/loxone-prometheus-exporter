@@ -412,3 +412,77 @@ class TestFilteringAndExclusion:
 
         # discovered counts all controls, exported excludes text-only
         assert d_val >= e_val
+
+
+# ── T053: OTLP Health Metrics Unit Tests ──────────────────────────────
+
+
+class TestOTLPHealthMetrics:
+    """Tests for OTLP health metrics defined in metrics.py."""
+
+    def test_otlp_export_status_exists(self) -> None:
+        from loxone_exporter.metrics import otlp_export_status
+
+        assert otlp_export_status is not None
+        assert otlp_export_status._name == "loxone_otlp_export_status"
+
+    def test_otlp_last_success_timestamp_exists(self) -> None:
+        from loxone_exporter.metrics import otlp_last_success_timestamp
+
+        assert otlp_last_success_timestamp is not None
+        assert otlp_last_success_timestamp._name == "loxone_otlp_last_success_timestamp_seconds"
+
+    def test_otlp_consecutive_failures_exists(self) -> None:
+        from loxone_exporter.metrics import otlp_consecutive_failures
+
+        assert otlp_consecutive_failures is not None
+        assert otlp_consecutive_failures._name == "loxone_otlp_consecutive_failures"
+
+    def test_otlp_export_duration_exists(self) -> None:
+        from loxone_exporter.metrics import otlp_export_duration
+
+        assert otlp_export_duration is not None
+        assert otlp_export_duration._name == "loxone_otlp_export_duration_seconds"
+
+    def test_otlp_exported_metrics_total_exists(self) -> None:
+        from loxone_exporter.metrics import otlp_exported_metrics_total
+
+        assert otlp_exported_metrics_total is not None
+        # Counter's _name doesn't include the _total suffix
+        assert "loxone_otlp_exported_metrics" in otlp_exported_metrics_total._name
+
+    def test_health_metrics_registered_in_registry(self) -> None:
+        """Verify OTLP health metrics can be registered and collected."""
+        from prometheus_client import CollectorRegistry
+
+        from loxone_exporter.metrics import (
+            otlp_consecutive_failures,
+            otlp_export_duration,
+            otlp_export_status,
+            otlp_exported_metrics_total,
+            otlp_last_success_timestamp,
+        )
+
+        registry = CollectorRegistry()
+        registry.register(otlp_export_status)
+        registry.register(otlp_last_success_timestamp)
+        registry.register(otlp_consecutive_failures)
+        registry.register(otlp_export_duration)
+        registry.register(otlp_exported_metrics_total)
+
+        # Set values and collect
+        otlp_export_status.set(1.0)
+        otlp_consecutive_failures.set(0.0)
+
+        from prometheus_client import generate_latest
+
+        output = generate_latest(registry).decode()
+        assert "loxone_otlp_export_status" in output
+        assert "loxone_otlp_consecutive_failures" in output
+
+        # Clean up: unregister to avoid pollution
+        registry.unregister(otlp_export_status)
+        registry.unregister(otlp_last_success_timestamp)
+        registry.unregister(otlp_consecutive_failures)
+        registry.unregister(otlp_export_duration)
+        registry.unregister(otlp_exported_metrics_total)
