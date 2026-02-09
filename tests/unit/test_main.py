@@ -113,6 +113,7 @@ class TestAsyncRunFunction:
     """Test _run async function orchestration."""
 
     @ pytest.mark.asyncio
+    @patch("loxone_exporter.__main__.asyncio.Event")  # Mock Event to control shutdown
     @patch("loxone_exporter.__main__.run_http_server")
     @patch("loxone_exporter.__main__.LoxoneClient")
     @patch("loxone_exporter.__main__.setup_logging")
@@ -123,6 +124,7 @@ class TestAsyncRunFunction:
         mock_setup_logging: Mock,
         mock_client_class: Mock,
         mock_run_server: AsyncMock,
+        mock_event_class: Mock,
     ) -> None:
         """One LoxoneClient created per miniserver config."""
         from loxone_exporter.config import ExporterConfig, MiniserverConfig
@@ -139,16 +141,26 @@ class TestAsyncRunFunction:
         mock_state1 = MiniserverState(name="ms1")
         mock_state2 = MiniserverState(name="ms2")
 
+        # Set up mock Event that triggers shutdown immediately
+        mock_event = Mock()
+        mock_event_class.return_value = mock_event
+
+        async def wait_then_raise():
+            # Trigger shutdown after a short delay to let tasks start
+            await asyncio.sleep(0.01)
+            raise asyncio.CancelledError()
+
+        mock_event.wait = AsyncMock(side_effect=wait_then_raise)
+
         mock_client1 = Mock()
-        mock_client1.run = AsyncMock(side_effect=lambda: asyncio.sleep(0.01))
+        mock_client1.run = AsyncMock()  # Return immediately
         mock_client1.get_state = Mock(return_value=mock_state1)
 
         mock_client2 = Mock()
-        mock_client2.run = AsyncMock(side_effect=lambda: asyncio.sleep(0.01))
+        mock_client2.run = AsyncMock()  # Return immediately
         mock_client2.get_state = Mock(return_value=mock_state2)
 
         mock_client_class.side_effect = [mock_client1, mock_client2]
-        mock_run_server.side_effect = lambda *a, **k: asyncio.sleep(0.01)
 
         from loxone_exporter.__main__ import _run
         await _run(None)
@@ -158,6 +170,7 @@ class TestAsyncRunFunction:
         mock_client_class.assert_any_call(config.miniservers[1])
 
     @pytest.mark.asyncio
+    @patch("loxone_exporter.__main__.asyncio.Event")  # Mock Event to control shutdown
     @patch("loxone_exporter.__main__.run_http_server")
     @patch("loxone_exporter.__main__.LoxoneClient")
     @patch("loxone_exporter.__main__.setup_logging")
@@ -168,6 +181,7 @@ class TestAsyncRunFunction:
         mock_setup_logging: Mock,
         mock_client_class: Mock,
         mock_run_server: AsyncMock,
+        mock_event_class: Mock,
     ) -> None:
         """All client and server tasks started in TaskGroup."""
         from loxone_exporter.config import ExporterConfig, MiniserverConfig
@@ -179,8 +193,20 @@ class TestAsyncRunFunction:
         mock_load_config.return_value = config
 
         mock_state = MiniserverState(name="ms")
+
+        # Set up mock Event that triggers shutdown immediately
+        mock_event = Mock()
+        mock_event_class.return_value = mock_event
+
+        async def wait_then_raise():
+            # Trigger shutdown after a short delay to let tasks start
+            await asyncio.sleep(0.01)
+            raise asyncio.CancelledError()
+
+        mock_event.wait = AsyncMock(side_effect=wait_then_raise)
+
         mock_client = Mock()
-        mock_client.run = AsyncMock(side_effect=lambda: asyncio.sleep(0.01))
+        mock_client.run = AsyncMock()  # Return immediately
         mock_client.get_state = Mock(return_value=mock_state)
         mock_client_class.return_value = mock_client
 
@@ -188,7 +214,7 @@ class TestAsyncRunFunction:
 
         async def mock_server_coro(*args: Any, **kwargs: Any) -> None:
             server_called.set()
-            await asyncio.sleep(0.01)
+            # Don't sleep - just set the event and return immediately
 
         mock_run_server.side_effect = mock_server_coro
 
@@ -222,24 +248,35 @@ class TestAsyncRunFunction:
         mock_load_config.return_value = config
 
         mock_state = MiniserverState(name="ms")
+
+        async def mock_server_forever(*args: Any, **kwargs: Any) -> None:
+            # Run " forever" but make it interruptible
+            try:
+                await asyncio.sleep(1)  # Reduced to 1s for faster tests
+            except asyncio.CancelledError:
+                raise
+
+        async def mock_client_forever():
+            # Client also runs "forever"
+            try:
+                await asyncio.sleep(1)  # Reduced to 1s for faster tests
+            except asyncio.CancelledError:
+                raise
+
         mock_client = Mock()
-        mock_client.run = AsyncMock()
+        mock_client.run = AsyncMock(side_effect=mock_client_forever)
         mock_client.get_state = Mock(return_value=mock_state)
         mock_client_class.return_value = mock_client
 
-        # Mock long-running server
-        async def mock_server_coro(*args: Any, **kwargs: Any) -> None:
-            await asyncio.sleep(100)  # Run "forever"
-
-        mock_run_server.side_effect = mock_server_coro
+        mock_run_server.side_effect = mock_server_forever
 
         from loxone_exporter.__main__ import _run
 
         # Run _run in background task
         run_task = asyncio.create_task(_run(None))
 
-        # Give it time to set up signal handlers
-        await asyncio.sleep(0.1)
+        # Give it time to set up (faster for CI)
+        await asyncio.sleep(0.05)
 
         # Cancel the task (simulating signal)
         run_task.cancel()
