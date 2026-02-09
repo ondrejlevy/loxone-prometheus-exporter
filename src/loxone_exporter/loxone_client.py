@@ -276,6 +276,13 @@ class LoxoneClient:
                                         else:
                                             # Header with no payload (e.g., KEEPALIVE)
                                             self._process_message(message)
+                                    except (
+                                        websockets.exceptions.ConnectionClosed,
+                                        websockets.exceptions.ConnectionClosedError,
+                                        websockets.exceptions.ConnectionClosedOK,
+                                    ):
+                                        # Let connection closed exceptions propagate
+                                        raise
                                     except Exception as e:
                                         logger.warning(
                                             "[%s] Error processing header frame: %s",

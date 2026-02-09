@@ -157,11 +157,13 @@ class TestEnvOverrides:
         assert ms.password == "pass123"
 
     def test_env_only_name_defaults_to_host(
-        self, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """When LOXONE_NAME is not set, name defaults to LOXONE_HOST value."""
         from loxone_exporter.config import load_config
 
+        # Change to temp dir to avoid loading default config.yml
+        monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("LOXONE_HOST", "192.168.1.50")
         monkeypatch.setenv("LOXONE_USERNAME", "prom")
         monkeypatch.setenv("LOXONE_PASSWORD", "pass123")
@@ -281,9 +283,11 @@ class TestValidation:
         with pytest.raises(ConfigError, match=r"(?i)miniserver"):
             load_config(str(p))
 
-    def test_no_config_no_env(self) -> None:
+    def test_no_config_no_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         from loxone_exporter.config import ConfigError, load_config
 
+        # Change to temp dir to avoid loading default config.yml
+        monkeypatch.chdir(tmp_path)
         with pytest.raises(ConfigError):
             load_config(None)
 
