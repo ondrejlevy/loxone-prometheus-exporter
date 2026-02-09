@@ -7,7 +7,7 @@ asyncio event loop as the WebSocket clients.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 from prometheus_client import CollectorRegistry, generate_latest
@@ -78,7 +78,7 @@ async def _healthz_handler(request: web.Request) -> web.Response:
         status = "unhealthy"
         http_status = 503
 
-    body = {
+    body: dict[str, Any] = {
         "status": status,
         "miniservers": miniservers,
     }

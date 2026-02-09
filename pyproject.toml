@@ -56,6 +56,9 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = [
     "Crypto.*",
+    "grpc",
+    "grpc.*",
+    "opentelemetry.*",
 ]
 ignore_missing_imports = true
 

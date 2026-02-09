@@ -76,7 +76,7 @@ class OTLPMetric:
     description: str
     unit: str
     type: str  # 'gauge', 'counter', 'histogram'
-    data_points: list[DataPoint] = field(default_factory=list)
+    data_points: list[DataPoint | HistogramDataPoint] = field(default_factory=list)
 
 
 @dataclass
@@ -250,7 +250,7 @@ class PrometheusToOTLPBridge:
                 timestamp_ns=now_ns,
             )
             # Store as a special data point — we use metric type to distinguish
-            metric.data_points.append(hdp)  # type: ignore[arg-type]
+            metric.data_points.append(hdp)
 
         return metric
 

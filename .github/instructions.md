@@ -293,17 +293,21 @@ python -m loxone_exporter
 
 ## Important Patterns for Copilot
 
-### Mandatory: Ruff Lint & Format After Every Change
+### Mandatory: Lint, Type-Check & Format After Every Change
 
-**After every code change you make**, you MUST run ruff to check and fix lint/format issues before considering the task complete:
+**After every code change you make**, you MUST run the full quality gate before considering the task complete:
 
 ```bash
 ruff check --fix src/ tests/
 ruff format src/ tests/
-ruff check src/ tests/   # Final verification — must show "All checks passed!"
+mypy src/
+ruff check src/ tests/   # Final verification - must show "All checks passed!"
 ```
 
-If `ruff check` reports any remaining errors after `--fix`, you MUST resolve them manually before committing or finishing the task. **Never leave ruff violations in the codebase.** This is a hard gate — treat any ruff failure as a blocking error.
+- `ruff check` must show **"All checks passed!"** with zero errors.
+- `mypy src/` must show **"Success: no issues found"** with zero errors.
+
+If either tool reports remaining errors after auto-fix, you MUST resolve them manually before committing or finishing the task. **Never leave ruff or mypy violations in the codebase.** This is a hard gate - treat any failure as a blocking error.
 
 ### When Adding a New Module
 1. Add type annotations to all functions

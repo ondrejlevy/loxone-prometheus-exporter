@@ -16,8 +16,8 @@ class ConfigError(Exception):
     """Raised when configuration is invalid or missing."""
 
 
-class ConfigurationError(ConfigError):
-    """Raised when OpenTelemetry configuration is invalid."""
+# Alias used by OTLP exporter module
+ConfigurationError = ConfigError
 
 
 _VALID_LOG_LEVELS = {"debug", "info", "warning", "error"}
@@ -29,7 +29,7 @@ _HOSTNAME_RE = re.compile(
 
 @dataclass(frozen=True)
 class TLSConfig:
-    """TLS configuration for OTLP connection."""
+    """TLS configuration for OTLP exporter."""
 
     enabled: bool = False
     cert_path: str | None = None
@@ -37,14 +37,14 @@ class TLSConfig:
 
 @dataclass(frozen=True)
 class AuthConfig:
-    """Authentication configuration for OTLP connection."""
+    """Authentication configuration for OTLP exporter."""
 
-    headers: dict[str, str] | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class OTLPConfiguration:
-    """Configuration for OTLP export behavior."""
+    """Configuration for OTLP metrics export."""
 
     enabled: bool = False
     endpoint: str = ""
@@ -280,7 +280,7 @@ def _build_otlp_config(raw: dict[str, Any]) -> OTLPConfiguration:
 
     auth_headers = auth_raw.get("headers")
     auth_config = AuthConfig(
-        headers=dict(auth_headers) if isinstance(auth_headers, dict) else None,
+        headers=dict(auth_headers) if isinstance(auth_headers, dict) else {},
     )
 
     return OTLPConfiguration(
