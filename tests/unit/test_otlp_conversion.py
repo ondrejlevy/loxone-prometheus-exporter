@@ -5,6 +5,7 @@ Covers task T027: Gauge, Counter, Histogram, Info → OTLP conversion.
 
 from __future__ import annotations
 
+import pytest
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
 
 from loxone_exporter.otlp_exporter import DataPoint, HistogramDataPoint, PrometheusToOTLPBridge
@@ -54,7 +55,7 @@ class TestGaugeConversion:
         bridge = PrometheusToOTLPBridge(registry)
         batch = bridge.convert_metrics()
 
-        ctrl = [m for m in batch.metrics if m.name == "ctrl"][0]
+        ctrl = next(m for m in batch.metrics if m.name == "ctrl")
         dp = ctrl.data_points[0]
         assert dp.attributes["miniserver"] == "home"
         assert dp.attributes["name"] == "light_1"
@@ -220,10 +221,6 @@ class TestMetricBatch:
         batch = bridge.convert_metrics()
         after = int(time.time() * 1_000_000_000)
 
-        m = [m for m in batch.metrics if m.name == "ts_test"][0]
+        m = next(m for m in batch.metrics if m.name == "ts_test")
         ts = m.data_points[0].timestamp_ns
         assert before <= ts <= after
-
-
-# Need pytest for approx
-import pytest

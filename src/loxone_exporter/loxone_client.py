@@ -125,7 +125,8 @@ class LoxoneClient:
 
         logger.info(
             "[%s] Structure loaded: %d controls, %d rooms, %d categories (Miniserver Type: %d)",
-            self._config.name, len(controls), len(rooms), len(categories), self._state.miniserver_type,
+            self._config.name, len(controls), len(rooms), len(categories),
+            self._state.miniserver_type,
         )
 
         # Subscribe to binary status updates

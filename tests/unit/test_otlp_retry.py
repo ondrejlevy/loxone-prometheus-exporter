@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── T016: Factory Function Tests ──────────────────────────────────────
 
 
@@ -182,7 +181,7 @@ class TestStateTransitions:
     """Tests for ExportState transitions via _handle_success / _handle_failure."""
 
     def test_handle_success_resets_state(self) -> None:
-        from loxone_exporter.otlp_exporter import ExportState, ExportStatus, _BASE_DELAY
+        from loxone_exporter.otlp_exporter import _BASE_DELAY, ExportState, ExportStatus
 
         status = ExportStatus(
             state=ExportState.EXPORTING,
@@ -199,7 +198,7 @@ class TestStateTransitions:
         assert status.current_backoff_seconds == 1.0
 
     def test_failure_increments_counter(self) -> None:
-        from loxone_exporter.otlp_exporter import ExportState, ExportStatus, _MAX_FAILURES
+        from loxone_exporter.otlp_exporter import _MAX_FAILURES, ExportState, ExportStatus
 
         status = ExportStatus(state=ExportState.EXPORTING, consecutive_failures=0)
         status.consecutive_failures += 1
@@ -211,7 +210,7 @@ class TestStateTransitions:
         assert status.state == ExportState.RETRYING
 
     def test_max_failures_transitions_to_failed(self) -> None:
-        from loxone_exporter.otlp_exporter import ExportState, ExportStatus, _MAX_FAILURES
+        from loxone_exporter.otlp_exporter import _MAX_FAILURES, ExportState, ExportStatus
 
         status = ExportStatus(
             state=ExportState.EXPORTING,

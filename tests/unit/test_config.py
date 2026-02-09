@@ -567,9 +567,9 @@ class TestEncryptionOptions:
 # ── OTLP Configuration ────────────────────────────────────────────────
 
 
-def _make_config_with_otlp(tmp_path: Path, otlp_section: dict[str, Any] | None = None) -> Path:
+def _make_config_with_otlp(tmp_path: Path, otlp_section: dict[str, object] | None = None) -> Path:
     """Helper to create a config file with OTLP section."""
-    cfg: dict[str, Any] = {
+    cfg: dict[str, object] = {
         "miniservers": [
             {"name": "home", "host": "192.168.1.100", "username": "admin", "password": "secret"}
         ],
@@ -679,7 +679,7 @@ class TestOTLPConfigValidation:
         from loxone_exporter.config import ConfigurationError, load_config
 
         p = _make_config_with_otlp(tmp_path, {"enabled": True})
-        with pytest.raises(ConfigurationError, match="endpoint.*required"):
+        with pytest.raises(ConfigurationError, match=r"endpoint.*required"):
             load_config(str(p))
 
     def test_vr003_invalid_scheme(self, tmp_path: Path) -> None:
@@ -721,7 +721,7 @@ class TestOTLPConfigValidation:
             "endpoint": "http://localhost:4317",
             "interval_seconds": 5,
         })
-        with pytest.raises(ConfigurationError, match="interval_seconds.*10 and 300"):
+        with pytest.raises(ConfigurationError, match=r"interval_seconds.*10 and 300"):
             load_config(str(p))
 
     def test_vr006_interval_too_high(self, tmp_path: Path) -> None:
@@ -732,7 +732,7 @@ class TestOTLPConfigValidation:
             "endpoint": "http://localhost:4317",
             "interval_seconds": 500,
         })
-        with pytest.raises(ConfigurationError, match="interval_seconds.*10 and 300"):
+        with pytest.raises(ConfigurationError, match=r"interval_seconds.*10 and 300"):
             load_config(str(p))
 
     def test_vr007_timeout_too_low(self, tmp_path: Path) -> None:
@@ -743,7 +743,7 @@ class TestOTLPConfigValidation:
             "endpoint": "http://localhost:4317",
             "timeout_seconds": 2,
         })
-        with pytest.raises(ConfigurationError, match="timeout_seconds.*5 and 60"):
+        with pytest.raises(ConfigurationError, match=r"timeout_seconds.*5 and 60"):
             load_config(str(p))
 
     def test_vr008_timeout_exceeds_interval(self, tmp_path: Path) -> None:
@@ -755,7 +755,7 @@ class TestOTLPConfigValidation:
             "interval_seconds": 20,
             "timeout_seconds": 25,
         })
-        with pytest.raises(ConfigurationError, match="timeout_seconds.*less than interval"):
+        with pytest.raises(ConfigurationError, match=r"timeout_seconds.*less than interval"):
             load_config(str(p))
 
     def test_vr009_tls_cert_required(self, tmp_path: Path) -> None:
@@ -766,7 +766,7 @@ class TestOTLPConfigValidation:
             "endpoint": "http://localhost:4317",
             "tls": {"enabled": True},
         })
-        with pytest.raises(ConfigurationError, match="cert_path.*required.*TLS"):
+        with pytest.raises(ConfigurationError, match=r"cert_path.*required.*TLS"):
             load_config(str(p))
 
     def test_vr010_cert_file_missing(self, tmp_path: Path) -> None:

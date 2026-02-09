@@ -289,7 +289,7 @@ class TestOTLPPerformance:
 
         # Convert metrics 10 times to amplify memory usage
         for _ in range(10):
-            batch = bridge.convert_metrics()
+            bridge.convert_metrics()
 
         snapshot2 = tracemalloc.take_snapshot()
         tracemalloc.stop()

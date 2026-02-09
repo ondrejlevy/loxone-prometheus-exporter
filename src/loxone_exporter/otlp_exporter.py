@@ -21,13 +21,11 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
-    MetricExportResult,
     MetricExporter,
+    MetricExportResult,
 )
-from opentelemetry.sdk.resources import Resource
 
 if TYPE_CHECKING:
     from prometheus_client import CollectorRegistry
@@ -229,7 +227,7 @@ class PrometheusToOTLPBridge:
             elif sample.name.endswith("_sum"):
                 buckets_by_labels[label_key]["sum"] = float(sample.value)
 
-        for label_key, data in buckets_by_labels.items():
+        for _label_key, data in buckets_by_labels.items():
             # Sort buckets by bound, exclude +Inf
             sorted_buckets = sorted(
                 [(b, c) for b, c in data["buckets"] if b != "+Inf"],
@@ -412,7 +410,7 @@ class OTLPExporter:
         self._task.cancel()
         try:
             await asyncio.wait_for(self._task, timeout=_SHUTDOWN_TIMEOUT)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
+        except (TimeoutError, asyncio.CancelledError):
             pass
         finally:
             self._task = None
@@ -602,6 +600,8 @@ class OTLPExporter:
             elif m.type == "histogram":
                 from opentelemetry.sdk.metrics.export import (
                     Histogram as OTELHistogram,
+                )
+                from opentelemetry.sdk.metrics.export import (
                     HistogramDataPoint as OTELHistogramDP,
                 )
 
