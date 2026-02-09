@@ -14,6 +14,7 @@ import hmac
 import json
 import logging
 import secrets
+import types
 import urllib.parse
 from typing import Any
 
@@ -197,6 +198,7 @@ async def _token_auth(
     key_bytes = bytes.fromhex(key_hex)
 
     # Step 4: Compute HMAC credentials (per Loxone protocol / PyLoxone)
+    crypto_hash_mod: types.ModuleType
     if hash_alg == "SHA1":
         hash_func = hashlib.sha1
         crypto_hash_mod = CRYPTO_SHA1
