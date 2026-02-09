@@ -126,9 +126,10 @@ class TestHTTPPublicKeyFetch:
     @pytest.mark.asyncio
     async def test_http_fetch_success(self) -> None:
         """Successful HTTP fetch returns public key."""
-        from loxone_exporter.loxone_auth import _fetch_public_key_http
-        from unittest.mock import MagicMock, patch
         import json
+        from unittest.mock import MagicMock, patch
+
+        from loxone_exporter.loxone_auth import _fetch_public_key_http
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps(
@@ -146,12 +147,13 @@ class TestHTTPPublicKeyFetch:
     @pytest.mark.asyncio
     async def test_http_fetch_unsuccessful_response_raises(self) -> None:
         """HTTP unsuccessful response raises AuthenticationError."""
+        import json
+        from unittest.mock import MagicMock, patch
+
         from loxone_exporter.loxone_auth import (
             AuthenticationError,
             _fetch_public_key_http,
         )
-        from unittest.mock import MagicMock, patch
-        import json
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps(
@@ -160,41 +162,47 @@ class TestHTTPPublicKeyFetch:
         mock_response.__enter__ = lambda self: self
         mock_response.__exit__ = lambda self, *args: None
 
-        with patch("urllib.request.urlopen", return_value=mock_response):
-            with pytest.raises(AuthenticationError, match="Failed to get RSA"):
-                await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")
+        with (
+            patch("urllib.request.urlopen", return_value=mock_response),
+            pytest.raises(AuthenticationError, match="Failed to get RSA"),
+        ):
+            await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")
 
     @pytest.mark.asyncio
     async def test_http_fetch_timeout_raises(self) -> None:
         """HTTP timeout raises AuthenticationError."""
+        from unittest.mock import patch
+
         from loxone_exporter.loxone_auth import (
             AuthenticationError,
             _fetch_public_key_http,
         )
-        from unittest.mock import patch
-        from urllib.error import URLError
-        import socket
 
-        with patch(
-            "urllib.request.urlopen",
-            side_effect=socket.timeout("Connection timed out"),
+        with (
+            patch(
+                "urllib.request.urlopen",
+                side_effect=TimeoutError("Connection timed out"),
+            ),
+            pytest.raises((AuthenticationError, TimeoutError)),
         ):
-            with pytest.raises((AuthenticationError, socket.timeout)):
-                await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")
+            await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")
 
     @pytest.mark.asyncio
     async def test_http_fetch_connection_error_raises(self) -> None:
         """HTTP connection error raises AuthenticationError."""
+        from unittest.mock import patch
+        from urllib.error import URLError
+
         from loxone_exporter.loxone_auth import (
             AuthenticationError,
             _fetch_public_key_http,
         )
-        from unittest.mock import patch
-        from urllib.error import URLError
 
-        with patch(
-            "urllib.request.urlopen",
-            side_effect=URLError("Connection refused"),
+        with (
+            patch(
+                "urllib.request.urlopen",
+                side_effect=URLError("Connection refused"),
+            ),
+            pytest.raises((AuthenticationError, URLError)),
         ):
-            with pytest.raises((AuthenticationError, URLError)):
-                await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")
+            await _fetch_public_key_http("192.168.1.1", 80, "admin", "password")

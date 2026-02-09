@@ -138,15 +138,15 @@ class TestAsyncRunFunction:
 
         mock_state1 = MiniserverState(name="ms1")
         mock_state2 = MiniserverState(name="ms2")
-        
+
         mock_client1 = Mock()
         mock_client1.run = AsyncMock(side_effect=lambda: asyncio.sleep(0.01))
         mock_client1.get_state = Mock(return_value=mock_state1)
-        
+
         mock_client2 = Mock()
         mock_client2.run = AsyncMock(side_effect=lambda: asyncio.sleep(0.01))
         mock_client2.get_state = Mock(return_value=mock_state2)
-        
+
         mock_client_class.side_effect = [mock_client1, mock_client2]
         mock_run_server.side_effect = lambda *a, **k: asyncio.sleep(0.01)
 
@@ -185,7 +185,7 @@ class TestAsyncRunFunction:
         mock_client_class.return_value = mock_client
 
         server_called = asyncio.Event()
-        
+
         async def mock_server_coro(*args: Any, **kwargs: Any) -> None:
             server_called.set()
             await asyncio.sleep(0.01)
