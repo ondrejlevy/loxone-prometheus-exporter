@@ -18,9 +18,9 @@ import urllib.parse
 from typing import Any
 
 from Crypto.Cipher import AES, PKCS1_v1_5
-from Crypto.Hash import HMAC as CryptoHMAC
-from Crypto.Hash import SHA1 as CryptoSHA1
-from Crypto.Hash import SHA256 as CryptoSHA256
+from Crypto.Hash import HMAC as CRYPTO_HMAC
+from Crypto.Hash import SHA1 as CRYPTO_SHA1
+from Crypto.Hash import SHA256 as CRYPTO_SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Util.Padding import pad
 
@@ -75,11 +75,11 @@ async def _fetch_public_key_http(
     import urllib.request
 
     url = f"http://{host}:{port}/jdev/sys/getPublicKey"
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url)  # noqa: S310
     credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
     req.add_header("Authorization", f"Basic {credentials}")
 
-    with urllib.request.urlopen(req, timeout=10) as response:
+    with urllib.request.urlopen(req, timeout=10) as response:  # noqa: S310
         data = json.loads(response.read())
 
     resp = data.get("LL", data)
@@ -170,7 +170,7 @@ async def _token_auth(
     aes_key = secrets.token_bytes(32)  # 256-bit
     aes_iv = secrets.token_bytes(16)  # 128-bit
     # Loxone expects hex-encoded key:iv
-    session_key = f"{aes_key.hex()}:{aes_iv.hex()}".encode("utf-8")
+    session_key = f"{aes_key.hex()}:{aes_iv.hex()}".encode()
 
     # Encrypt session key with RSA
     encrypted_session = cipher_rsa.encrypt(session_key)
@@ -199,18 +199,18 @@ async def _token_auth(
     # Step 4: Compute HMAC credentials (per Loxone protocol / PyLoxone)
     if hash_alg == "SHA1":
         hash_func = hashlib.sha1
-        crypto_hash_mod = CryptoSHA1
+        crypto_hash_mod = CRYPTO_SHA1
     else:  # SHA256 or unknown → default to SHA256
         hash_func = hashlib.sha256
-        crypto_hash_mod = CryptoSHA256
+        crypto_hash_mod = CRYPTO_SHA256
 
     # pwd_hash = HASH("password:user_salt") → uppercase hex
     pwd_hash = hash_func(
-        f"{password}:{user_salt}".encode("utf-8")
+        f"{password}:{user_salt}".encode()
     ).hexdigest().upper()
     # final_hash = HMAC(key, "username:pwd_hash")
-    digester = CryptoHMAC.new(
-        key_bytes, f"{username}:{pwd_hash}".encode("utf-8"), crypto_hash_mod,
+    digester = CRYPTO_HMAC.new(
+        key_bytes, f"{username}:{pwd_hash}".encode(), crypto_hash_mod,
     )
     final_hash = digester.hexdigest()
 

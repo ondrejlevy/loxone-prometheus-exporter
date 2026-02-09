@@ -112,21 +112,31 @@ class LoxoneClient:
         # Subscribe to binary status updates
         await ws.send("jdev/sps/enablebinstatusupdate")
         resp = await ws.recv()
-        logger.info("[%s] enablebinstatusupdate response (raw): type=%s len=%d", 
-                    self._config.name, type(resp).__name__, len(resp))
+        logger.info(
+            "[%s] enablebinstatusupdate response (raw): type=%s len=%d",
+            self._config.name, type(resp).__name__, len(resp)
+        )
         # Consume binary header frame(s) if present
         consecutive_headers = 0
         while isinstance(resp, bytes) and len(resp) == 8:
             consecutive_headers += 1
             resp = await ws.recv()
-            logger.debug("[%s] Consumed header frame #%d, next: type=%s len=%d", 
-                        self._config.name, consecutive_headers, type(resp).__name__, len(resp))
-        
+            logger.debug(
+                "[%s] Consumed header frame #%d, next: type=%s len=%d",
+                self._config.name, consecutive_headers,
+                type(resp).__name__, len(resp)
+            )
+
         if isinstance(resp, str):
-            logger.info("[%s] enablebinstatusupdate JSON response: %s", self._config.name, resp[:500])
+            logger.info(
+                "[%s] enablebinstatusupdate JSON response: %s",
+                self._config.name, resp[:500]
+            )
         elif isinstance(resp, bytes):
-            logger.info("[%s] enablebinstatusupdate binary response: %d bytes", 
-                       self._config.name, len(resp))
+            logger.info(
+                "[%s] enablebinstatusupdate binary response: %d bytes",
+                self._config.name, len(resp)
+            )
 
         self._state.connected = True
         self._backoff = 1.0  # Reset backoff on success
@@ -156,15 +166,23 @@ class LoxoneClient:
 
         if header.msg_type == MSG_VALUE_STATES:
             entries = parse_value_states(payload)
-            logger.debug("[%s] VALUE_STATES: %d entries, state_map has %d entries", 
-                        self._state.name, len(entries), len(self._state.state_map))
+            logger.debug(
+                "[%s] VALUE_STATES: %d entries, state_map has %d entries",
+                self._state.name, len(entries), len(self._state.state_map)
+            )
             if entries and len(self._state.state_map) > 0:
                 # Log first few UUIDs for debugging
                 sample_state_uuids = list(self._state.state_map.keys())[:3]
                 sample_value_uuids = [uuid_str for uuid_str, _ in entries[:3]]
-                logger.debug("[%s] Sample state_map UUIDs: %s", self._state.name, sample_state_uuids)
-                logger.debug("[%s] Sample VALUE_STATES UUIDs: %s", self._state.name, sample_value_uuids)
-            
+                logger.debug(
+                    "[%s] Sample state_map UUIDs: %s",
+                    self._state.name, sample_state_uuids
+                )
+                logger.debug(
+                    "[%s] Sample VALUE_STATES UUIDs: %s",
+                    self._state.name, sample_value_uuids
+                )
+
             updated_count = 0
             for uuid_str, value in entries:
                 ref = self._state.state_map.get(uuid_str)
@@ -185,8 +203,10 @@ class LoxoneClient:
                     logger.debug("[%s] Unknown state UUID: %s", self._state.name, uuid_str)
             if entries:
                 self._state.last_update_ts = time.time()
-                logger.debug("[%s] Updated %d/%d state values", 
-                           self._state.name, updated_count, len(entries))
+                logger.debug(
+                    "[%s] Updated %d/%d state values",
+                    self._state.name, updated_count, len(entries)
+                )
 
         elif header.msg_type == MSG_TEXT_STATES:
             text_entries = parse_text_states(payload)
@@ -242,8 +262,10 @@ class LoxoneClient:
                                                 # Combine header + payload
                                                 message = message + payload
                                                 logger.debug(
-                                                    "[%s] Received payload: %d bytes (expected %d)",
-                                                    self._state.name, len(payload), hdr.exact_length,
+                                                    "[%s] Received payload: %d bytes "
+                                                    "(expected %d)",
+                                                    self._state.name, len(payload),
+                                                    hdr.exact_length,
                                                 )
                                                 self._process_message(message)
                                             else:

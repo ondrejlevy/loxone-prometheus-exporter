@@ -20,10 +20,10 @@ _TEXT_ONLY_TYPES = frozenset({
 
 def _normalize_loxone_uuid(loxone_uuid: str) -> str:
     """Normalize Loxone's compact UUID format to standard RFC4122.
-    
+
     Loxone uses format: 8-4-4-16 (collapses last two groups)
     Standard UUID: 8-4-4-4-12
-    
+
     Example: '9febb915-033d-7e3b-01ff504f94a0ef1e' → '9febb915-033d-7e3b-01ff-504f94a0ef1e'
     """
     # Remove all hyphens
@@ -31,7 +31,7 @@ def _normalize_loxone_uuid(loxone_uuid: str) -> str:
     if len(clean) != 32:
         # Already in correct format or invalid
         return loxone_uuid
-    
+
     # Reconstruct as 8-4-4-4-12
     return f"{clean[:8]}-{clean[8:12]}-{clean[12:16]}-{clean[16:20]}-{clean[20:32]}"
 
