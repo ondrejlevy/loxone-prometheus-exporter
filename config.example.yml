@@ -5,16 +5,19 @@
 miniservers:
   - name: "home"                      # Unique label → Prometheus `miniserver` label
     host: "192.168.1.100"             # IP or hostname of the Miniserver
-    port: 80                          # WebSocket port (default: 80)
+    port: 80                          # WebSocket port for unencrypted connections (default: 80)
+    ssl_port: 443                     # WebSocket port for encrypted connections (default: 443)
     username: "prometheus"            # Loxone user (overridable: LOXONE_USERNAME)
     password: "your-password-here"    # Loxone password (overridable: LOXONE_PASSWORD)
     use_encryption: false             # Use wss:// instead of ws:// (default: false)
     force_encryption: false           # Require encryption, fail if not available (default: false)
-                                      # Note: Miniserver 2 (Gen2) will auto-enable encryption
+                                      # Note: Miniserver 2 (Gen2) will auto-enable encryption on ssl_port
 
   # Uncomment for multiple Miniservers:
   # - name: "office"
   #   host: "192.168.1.101"
+  #   port: 80
+  #   ssl_port: 443
   #   username: "prometheus"
   #   password: "office-password"
   #   use_encryption: true            # Force encryption for this Miniserver
@@ -50,3 +53,14 @@ include_text_values: false            # Export text-only controls as info metric
 #     headers:                         # Authentication headers (optional)
 #       Authorization: "Bearer token"
 #       X-API-Key: "your-key"
+# Example: Direct export to Grafana Cloud (no separate collector needed)
+# Uncomment and configure the following section to send metrics to Grafana Cloud:
+# opentelemetry:
+#   enabled: true
+#   endpoint: "https://otlp-gateway-prod-<YOUR-REGION>.grafana.net/otlp"  # Get from Grafana Cloud Portal
+#   protocol: http                                                         # Grafana Cloud uses HTTP/protobuf
+#   interval_seconds: 60                                                   # Export every 60 seconds
+#   timeout_seconds: 30
+#   auth:
+#     headers:
+#       Authorization: "Basic%20<YOUR-BASE64-ENCODED-TOKEN>"               # Note: Use 'Basic%20' (not 'Basic ')

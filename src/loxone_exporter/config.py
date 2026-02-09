@@ -65,11 +65,14 @@ class MiniserverConfig:
       Setting force_encryption=True implies use_encryption=True.
     - Auto-detection: When neither option is set, encryption is automatically
       enabled when Miniserver 2 (Gen2) is detected.
+    - ssl_port: Port to use for encrypted connections (default: 443).
+      When auto-detection triggers or use_encryption is enabled, this port is used.
     """
 
     name: str
     host: str
     port: int = 80
+    ssl_port: int = 443
     username: str = ""
     password: str = ""
     use_encryption: bool = False
@@ -147,6 +150,7 @@ def _validate_config(config: ExporterConfig) -> None:
         if not ms.name:
             raise ConfigError("Miniserver name must not be empty")
         _validate_port(ms.port, f"Miniserver {ms.name!r} port")
+        _validate_port(ms.ssl_port, f"Miniserver {ms.name!r} ssl_port")
         if ms.name in names:
             raise ConfigError(f"Duplicate miniserver name {ms.name!r}")
         names.add(ms.name)
@@ -158,6 +162,7 @@ def _build_ms_config(raw: dict[str, Any]) -> MiniserverConfig:
         name=str(raw.get("name", "")),
         host=str(raw.get("host", "")),
         port=int(raw.get("port", 80)),
+        ssl_port=int(raw.get("ssl_port", 443)),
         username=str(raw.get("username", "")),
         password=str(raw.get("password", "")),
         use_encryption=bool(raw.get("use_encryption", False)),

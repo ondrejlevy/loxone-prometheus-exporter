@@ -57,6 +57,8 @@ class LoxoneClient:
         self._last_recv_time: float = 0.0
         self._use_encryption = ms_config.use_encryption or ms_config.force_encryption
         self._detected_miniserver_2 = False
+        # Current port - will switch to ssl_port when encryption is enabled
+        self._current_port = ms_config.ssl_port if self._use_encryption else ms_config.port
 
     def get_state(self) -> MiniserverState:
         """Return the current MiniserverState snapshot."""
@@ -67,7 +69,7 @@ class LoxoneClient:
         protocol = "wss" if self._use_encryption else "ws"
         logger.info(
             "[%s] Connected to %s://%s:%d, authenticating...",
-            self._config.name, protocol, self._config.host, self._config.port,
+            self._config.name, protocol, self._config.host, self._current_port,
         )
 
         # Authenticate
@@ -76,7 +78,7 @@ class LoxoneClient:
             self._config.username,
             self._config.password,
             host=self._config.host,
-            port=self._config.port,
+            port=self._config.port,  # Always use original port for HTTP API
         )
         logger.info("[%s] Authentication successful", self._config.name)
 
@@ -115,11 +117,12 @@ class LoxoneClient:
         if self._state.miniserver_type == 2 and not self._use_encryption:
             logger.warning(
                 "[%s] Miniserver 2 detected. Encryption should be used for secure communication. "
-                "Reconnecting with encryption enabled...",
-                self._config.name
+                "Reconnecting with encryption enabled on port %d...",
+                self._config.name, self._config.ssl_port
             )
             self._detected_miniserver_2 = True
             self._use_encryption = True
+            self._current_port = self._config.ssl_port
             # Close current connection to trigger reconnect with encryption
             raise LoxoneConnectionError("Switching to encrypted connection for Miniserver 2")
 
@@ -251,7 +254,7 @@ class LoxoneClient:
         """
         while True:
             protocol = "wss" if self._use_encryption else "ws"
-            uri = f"{protocol}://{self._config.host}:{self._config.port}/ws/rfc6455"
+            uri = f"{protocol}://{self._config.host}:{self._current_port}/ws/rfc6455"
 
             try:
                 # For wss, we need ssl context

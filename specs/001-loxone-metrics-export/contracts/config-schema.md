@@ -11,9 +11,12 @@
 miniservers:
   - name: "home"                    # Required. Unique label → Prometheus `miniserver` label
     host: "192.168.1.100"           # Required. IP or hostname
-    port: 80                        # Optional. Default: 80
+    port: 80                        # Optional. Default: 80 (for unencrypted connections)
+    ssl_port: 443                   # Optional. Default: 443 (for encrypted connections)
     username: "prometheus"          # Required. Overridable via LOXONE_USERNAME env var
     password: "secret"              # Required. Overridable via LOXONE_PASSWORD env var
+    use_encryption: false           # Optional. Default: false. Enable wss:// encrypted connections
+    force_encryption: false         # Optional. Default: false. Require encryption from start
 
 # HTTP server configuration
 listen_port: 9504                   # Optional. Default: 9504
@@ -63,8 +66,22 @@ LOXONE_PASSWORD=secret
 3. `host` must be non-empty (valid hostname or IP)
 4. `username` and `password` must be non-empty
 5. `port` must be 1–65535
-6. `listen_port` must be 1–65535
-7. `log_level` must be one of: `debug`, `info`, `warning`, `error`
+6. `ssl_port` must be 1–65535
+7. `listen_port` must be 1–65535
+8. `log_level` must be one of: `debug`, `info`, `warning`, `error`
+9. `log_format` must be one of: `json`, `text`
+10. `exclude_names` entries are treated as glob patterns (using `fnmatch`)
+
+## Encryption Options
+
+The exporter supports both unencrypted (ws://) and encrypted (wss://) WebSocket connections:
+
+- **Auto-detection**: When Miniserver 2 (Gen2) is detected, the exporter automatically switches to encrypted connection using `ssl_port` (default: 443)
+- **Manual encryption**: Set `use_encryption: true` to force encrypted connections from the start
+- **Force encryption**: Set `force_encryption: true` to require encryption without auto-detection (implies `use_encryption: true`)
+- **Custom SSL port**: Set `ssl_port` to use a non-standard port for encrypted connections
+
+**Note**: HTTP API requests (for RSA public key fetching) always use the `port` value, regardless of encryption settings.
 8. `log_format` must be one of: `json`, `text`
 9. `exclude_names` entries are treated as glob patterns (using `fnmatch`)
 
