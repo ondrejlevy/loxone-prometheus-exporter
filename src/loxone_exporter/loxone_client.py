@@ -68,12 +68,27 @@ class LoxoneClient:
         )
 
         # Authenticate
-        await authenticate(ws, self._config.username, self._config.password)
+        await authenticate(
+            ws,
+            self._config.username,
+            self._config.password,
+            host=self._config.host,
+            port=self._config.port,
+        )
         logger.info("[%s] Authentication successful", self._config.name)
 
         # Download structure file
         await ws.send("data/LoxAPP3.json")
+        # Consume binary header frame(s): an estimated header is always
+        # followed by an exact header before the actual payload.
         structure_data = await ws.recv()
+        while isinstance(structure_data, bytes) and len(structure_data) == 8:
+            hdr = parse_header(structure_data)
+            logger.debug(
+                "[%s] Structure header: type=%d estimated=%s len=%d",
+                self._config.name, hdr.msg_type, hdr.estimated, hdr.exact_length,
+            )
+            structure_data = await ws.recv()
 
         if isinstance(structure_data, str):
             structure = json.loads(structure_data)
@@ -97,7 +112,21 @@ class LoxoneClient:
         # Subscribe to binary status updates
         await ws.send("jdev/sps/enablebinstatusupdate")
         resp = await ws.recv()
-        logger.debug("[%s] enablebinstatusupdate response: %s", self._config.name, resp)
+        logger.info("[%s] enablebinstatusupdate response (raw): type=%s len=%d", 
+                    self._config.name, type(resp).__name__, len(resp))
+        # Consume binary header frame(s) if present
+        consecutive_headers = 0
+        while isinstance(resp, bytes) and len(resp) == 8:
+            consecutive_headers += 1
+            resp = await ws.recv()
+            logger.debug("[%s] Consumed header frame #%d, next: type=%s len=%d", 
+                        self._config.name, consecutive_headers, type(resp).__name__, len(resp))
+        
+        if isinstance(resp, str):
+            logger.info("[%s] enablebinstatusupdate JSON response: %s", self._config.name, resp[:500])
+        elif isinstance(resp, bytes):
+            logger.info("[%s] enablebinstatusupdate binary response: %d bytes", 
+                       self._config.name, len(resp))
 
         self._state.connected = True
         self._backoff = 1.0  # Reset backoff on success
@@ -119,6 +148,7 @@ class LoxoneClient:
     def _process_message(self, data: bytes) -> None:
         """Process a binary message from the Miniserver."""
         if len(data) < _HEADER_SIZE:
+            logger.warning("[%s] Binary message too short: %d bytes", self._state.name, len(data))
             return
 
         header = parse_header(data[:_HEADER_SIZE])
@@ -126,23 +156,37 @@ class LoxoneClient:
 
         if header.msg_type == MSG_VALUE_STATES:
             entries = parse_value_states(payload)
+            logger.debug("[%s] VALUE_STATES: %d entries, state_map has %d entries", 
+                        self._state.name, len(entries), len(self._state.state_map))
+            if entries and len(self._state.state_map) > 0:
+                # Log first few UUIDs for debugging
+                sample_state_uuids = list(self._state.state_map.keys())[:3]
+                sample_value_uuids = [uuid_str for uuid_str, _ in entries[:3]]
+                logger.debug("[%s] Sample state_map UUIDs: %s", self._state.name, sample_state_uuids)
+                logger.debug("[%s] Sample VALUE_STATES UUIDs: %s", self._state.name, sample_value_uuids)
+            
+            updated_count = 0
             for uuid_str, value in entries:
                 ref = self._state.state_map.get(uuid_str)
                 if ref:
                     ctrl = self._state.controls.get(ref.control_uuid)
                     if ctrl and ref.state_name in ctrl.states:
                         ctrl.states[ref.state_name].value = value
+                        updated_count += 1
                     else:
                         # Check subcontrols
                         for parent in self._state.controls.values():
                             for sc in parent.sub_controls:
                                 if sc.uuid == ref.control_uuid and ref.state_name in sc.states:
                                     sc.states[ref.state_name].value = value
+                                    updated_count += 1
                                     break
                 else:
                     logger.debug("[%s] Unknown state UUID: %s", self._state.name, uuid_str)
             if entries:
                 self._state.last_update_ts = time.time()
+                logger.debug("[%s] Updated %d/%d state values", 
+                           self._state.name, updated_count, len(entries))
 
         elif header.msg_type == MSG_TEXT_STATES:
             text_entries = parse_text_states(payload)
@@ -183,7 +227,50 @@ class LoxoneClient:
                         async for message in ws:
                             self._last_recv_time = time.monotonic()
                             if isinstance(message, bytes):
-                                self._process_message(message)
+                                # Check if this is a header-only frame
+                                if len(message) == _HEADER_SIZE:
+                                    try:
+                                        hdr = parse_header(message)
+                                        logger.debug(
+                                            "[%s] Received header: type=%d payload_len=%d",
+                                            self._state.name, hdr.msg_type, hdr.exact_length,
+                                        )
+                                        # If there's a payload, receive it
+                                        if hdr.exact_length > 0:
+                                            payload = await ws.recv()
+                                            if isinstance(payload, bytes):
+                                                # Combine header + payload
+                                                message = message + payload
+                                                logger.debug(
+                                                    "[%s] Received payload: %d bytes (expected %d)",
+                                                    self._state.name, len(payload), hdr.exact_length,
+                                                )
+                                                self._process_message(message)
+                                            else:
+                                                logger.warning(
+                                                    "[%s] Expected binary payload, got text: %s",
+                                                    self._state.name, str(payload)[:100],
+                                                )
+                                        else:
+                                            # Header with no payload (e.g., KEEPALIVE)
+                                            self._process_message(message)
+                                    except Exception as e:
+                                        logger.warning(
+                                            "[%s] Error processing header frame: %s",
+                                            self._state.name, e,
+                                        )
+                                elif len(message) > _HEADER_SIZE:
+                                    # Complete message (header + payload in one frame)
+                                    logger.debug(
+                                        "[%s] Received complete message: %d bytes",
+                                        self._state.name, len(message),
+                                    )
+                                    self._process_message(message)
+                                else:
+                                    logger.warning(
+                                        "[%s] Received short binary frame: %d bytes",
+                                        self._state.name, len(message),
+                                    )
                             elif isinstance(message, str):
                                 # Text messages (command responses during operation)
                                 logger.debug(
