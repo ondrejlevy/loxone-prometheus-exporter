@@ -87,6 +87,7 @@ class MiniserverState:
     name: str
     serial: str = ""
     firmware: str = ""
+    miniserver_type: int = 0
     connected: bool = False
     last_update_ts: float = 0.0
     controls: dict[str, Control] = field(default_factory=dict)
