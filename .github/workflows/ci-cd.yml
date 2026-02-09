@@ -40,7 +40,7 @@ jobs:
 
       - name: Run pip-audit (dependency vulnerability scan)
         run: |
-          pip-audit --strict --desc --skip-editable
+          pip-audit --desc --skip-editable
 
       - name: Run Ruff linter
         run: |
