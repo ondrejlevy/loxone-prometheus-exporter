@@ -4,7 +4,7 @@
 
 Prometheus exporter for Loxone Miniserver control values. Connects to one or more Loxone Miniservers via WebSocket, auto-discovers all controls from `LoxAPP3.json`, subscribes to real-time binary value events, and exposes them as Prometheus gauge metrics on `GET /metrics`. Includes a `GET /healthz` JSON health endpoint.
 
-- **Language**: Python 3.13 (strict typing, `from __future__ import annotations`)
+- **Language**: Python 3.14 (strict typing, `from __future__ import annotations`)
 - **Runtime**: Single `asyncio` event loop — all I/O is async
 - **Package layout**: `src/loxone_exporter/` (setuptools with `src` layout)
 - **Entry point**: `python -m loxone_exporter [--config config.yml]`
@@ -160,7 +160,7 @@ Pinned versions for reproducible Docker builds: `requirements.lock`
 
 ### Prerequisites
 
-- **Python**: 3.13+ (managed via `pyenv`)
+- **Python**: 3.14+ (managed via `pyenv`)
 - **Container runtime**: Podman (used instead of Docker)
 - **pyenv**: For managing Python versions
 - **Git**: Version control
@@ -168,11 +168,11 @@ Pinned versions for reproducible Docker builds: `requirements.lock`
 ### Python Setup with pyenv
 
 ```bash
-# Install Python 3.13 via pyenv (if not already installed)
-pyenv install 3.13
+# Install Python 3.14 via pyenv (if not already installed)
+pyenv install 3.14
 
 # Set local Python version for this project
-pyenv local 3.13
+pyenv local 3.14
 
 # Verify
 python --version   # Should show Python 3.13.x
