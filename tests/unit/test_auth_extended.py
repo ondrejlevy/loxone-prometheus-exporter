@@ -5,11 +5,27 @@ This file demonstrates how to implement tests from COVERAGE_ANALYSIS.md Phase 2.
 
 from __future__ import annotations
 
+import json
+from unittest.mock import AsyncMock
+
 import pytest
 
 from loxone_exporter.loxone_auth import (
     _normalize_public_key,
     _parse_response,
+)
+
+# A real RSA-2048 public key for testing (not a secret — test-only)
+_SAMPLE_RSA_PUB_PEM = (
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0BMkI2+qRAzIdvxJtJH1\n"
+    "+cYEuaDnzIQkBlZ4a8nbNUkf8yDAnl+js8GM8ui78DaLNdhibJXqqILuegNPT7jB\n"
+    "x9Bjvap5CEC/ZnNTWAoj4GVuK1oZ+OAc6OhPQwlsuPmO6LsvDRdKJkm43pujbrsK\n"
+    "VmBoQiP3p4IeV0tqQEEDlfvWK4kfJf8tvwXK4dUcgonjn/zDY/LbobbIWVIuzFvc\n"
+    "oCH/gdvcRa+XtGAwpUk0iYjbwxfrk2NBuLF0yl8ETHcNOPOkmn3x4OePWK74HoWM\n"
+    "/ryc698xhJz2Wv2DEA7xx1PBXXypwNAPqvavtFyAnsafi08remJ/KRsg6SDL7x3O\n"
+    "9QIDAQAB\n"
+    "-----END PUBLIC KEY-----"
 )
 
 
@@ -102,22 +118,102 @@ test1234567890
 class TestTokenResponseVariants:
     """Test different token response formats (extending existing tests)."""
 
-    # Note: These would be integration tests with mock WebSocket
-    # Shown here as examples of what to test
+    async def test_token_as_dict_with_token_field(self) -> None:
+        """Token as dict with 'token' field logs validUntil."""
+        from loxone_exporter.loxone_auth import authenticate
 
-    @pytest.mark.skip(reason="Requires WebSocket mock - see test_auth.py")
-    def test_token_as_dict_with_token_field(self) -> None:
-        """Token as dict with 'token' field."""
-        # TODO: Mock WebSocket response with:
-        # {"LL": {"Code": "200", "value": {"token": "abc123", "validUntil": ...}}}
-        pass
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getPublicKey",
+                        "value": _SAMPLE_RSA_PUB_PEM,
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/keyexchange",
+                        "value": "ok",
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getkey2/admin",
+                        "value": {
+                            "key": "aa" * 32,
+                            "salt": "bb" * 16,
+                            "hashAlg": "SHA256",
+                        },
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/gettoken",
+                        "value": {
+                            "token": "abc123",
+                            "key": "cc" * 16,
+                            "validUntil": 9999999999,
+                            "tokenRights": 2,
+                            "unsecurePass": False,
+                        },
+                        "Code": "200",
+                    }
+                }),
+            ]
+        )
 
-    @pytest.mark.skip(reason="Requires WebSocket mock - see test_auth.py")
-    def test_token_missing_uses_empty_string(self) -> None:
-        """Missing token field uses empty string."""
-        # TODO: Mock WebSocket response with:
-        # {"LL": {"Code": "200", "value": {}}}
-        pass
+        result = await authenticate(ws, "admin", "secret")
+        assert result is True
+
+    async def test_token_missing_uses_empty_string(self) -> None:
+        """Token response dict without 'token' key still succeeds."""
+        from loxone_exporter.loxone_auth import authenticate
+
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=[
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getPublicKey",
+                        "value": _SAMPLE_RSA_PUB_PEM,
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/keyexchange",
+                        "value": "ok",
+                        "Code": "200",
+                    }
+                }),
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/getkey2/admin",
+                        "value": {
+                            "key": "aa" * 32,
+                            "salt": "bb" * 16,
+                            "hashAlg": "SHA256",
+                        },
+                        "Code": "200",
+                    }
+                }),
+                # Token response with empty dict value — no 'token' key
+                json.dumps({
+                    "LL": {
+                        "control": "dev/sys/gettoken",
+                        "value": {},
+                        "Code": "200",
+                    }
+                }),
+            ]
+        )
+
+        result = await authenticate(ws, "admin", "secret")
+        assert result is True
 
 
 class TestHTTPPublicKeyFetch:

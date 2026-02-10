@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -41,12 +41,14 @@ class TestArgumentParsing:
 class TestMainErrorHandling:
     """Test main entry point error handling."""
 
+    @patch("loxone_exporter.__main__._run", new_callable=MagicMock)
     @patch("loxone_exporter.__main__.asyncio.run")
     @patch("loxone_exporter.__main__._parse_args")
     def test_config_error_exits_with_code_1(
         self,
         mock_parse_args: Mock,
         mock_asyncio_run: Mock,
+        mock_run: Mock,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """ConfigError causes exit code 1."""
@@ -63,10 +65,11 @@ class TestMainErrorHandling:
         assert "Configuration error" in captured.err
         assert "Invalid config" in captured.err
 
+    @patch("loxone_exporter.__main__._run", new_callable=MagicMock)
     @patch("loxone_exporter.__main__.asyncio.run")
     @patch("loxone_exporter.__main__._parse_args")
     def test_keyboard_interrupt_exits_cleanly(
-        self, mock_parse_args: Mock, mock_asyncio_run: Mock
+        self, mock_parse_args: Mock, mock_asyncio_run: Mock, mock_run: Mock,
     ) -> None:
         """KeyboardInterrupt exits without error (no exception raised)."""
         mock_parse_args.return_value = Mock(config=None)
@@ -75,12 +78,14 @@ class TestMainErrorHandling:
         # Should not raise SystemExit
         main()
 
+    @patch("loxone_exporter.__main__._run", new_callable=MagicMock)
     @patch("loxone_exporter.__main__.asyncio.run")
     @patch("loxone_exporter.__main__._parse_args")
     def test_unexpected_error_exits_with_code_2(
         self,
         mock_parse_args: Mock,
         mock_asyncio_run: Mock,
+        mock_run: Mock,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Unexpected exceptions cause exit code 2."""
@@ -95,10 +100,10 @@ class TestMainErrorHandling:
         assert "Fatal error" in captured.err
         assert "Unexpected error" in captured.err
 
-    @patch("loxone_exporter.__main__._run")
+    @patch("loxone_exporter.__main__._run", new_callable=MagicMock)
     @patch("loxone_exporter.__main__._parse_args")
     def test_passes_config_path_to_run(
-        self, mock_parse_args: Mock, mock_run: AsyncMock
+        self, mock_parse_args: Mock, mock_run: Mock
     ) -> None:
         """Config path from args is passed to _run()."""
         mock_parse_args.return_value = Mock(config="/custom/config.yml")
@@ -150,7 +155,7 @@ class TestAsyncRunFunction:
             await asyncio.sleep(0.01)
             raise asyncio.CancelledError()
 
-        mock_event.wait = AsyncMock(side_effect=wait_then_raise)
+        mock_event.wait = wait_then_raise
 
         mock_client1 = Mock()
         mock_client1.run = AsyncMock()  # Return immediately
@@ -203,7 +208,7 @@ class TestAsyncRunFunction:
             await asyncio.sleep(0.01)
             raise asyncio.CancelledError()
 
-        mock_event.wait = AsyncMock(side_effect=wait_then_raise)
+        mock_event.wait = wait_then_raise
 
         mock_client = Mock()
         mock_client.run = AsyncMock()  # Return immediately
