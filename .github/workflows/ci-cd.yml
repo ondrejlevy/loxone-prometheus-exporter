@@ -58,7 +58,7 @@ jobs:
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -98,7 +98,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=sha,prefix={{branch}}-
+            type=sha,enable={{is_default_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
@@ -126,9 +126,10 @@ jobs:
           push-to-registry: true
 
       - name: Scan Docker image with Trivy
+        if: github.event_name != 'pull_request'
         uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac # master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '1'
@@ -137,6 +138,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@28d71544de8eaf1b958d335707167c5f783590ad # v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           artifact-name: sbom-cyclonedx.json
           format: cyclonedx-json
