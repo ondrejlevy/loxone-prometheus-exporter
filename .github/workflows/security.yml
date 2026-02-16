@@ -37,7 +37,7 @@ jobs:
       - name: Build image
         run: docker build -f Dockerfile -t loxone-prometheus-exporter:scan .
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac # master
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # master
         with:
           image-ref: "loxone-prometheus-exporter:scan"
           format: "sarif"
@@ -55,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@22438a435773de8c97dc0958cc0b823c45b064ac # master
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # master
         with:
           scan-type: "fs"
           scan-ref: "."
