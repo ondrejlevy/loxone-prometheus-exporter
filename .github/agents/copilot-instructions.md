@@ -1,6 +1,6 @@
 # loxone-prometheus-exporter Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-02-09
+Auto-generated from all feature plans. Last updated: 2026-04-04
 
 ## Active Technologies
 

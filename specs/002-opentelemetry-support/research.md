@@ -18,7 +18,7 @@ Use official OpenTelemetry Python SDK packages:
 ### Rationale
 
 - **Official SDK**: Maintained by OpenTelemetry project (CNCF), stable API, guaranteed OTLP spec compliance
-- **Python 3.13 compatible**: All three packages support Python ≥3.8, tested with 3.13
+- **Python 3.13+ compatible**: All three packages support Python ≥3.8; compatibility with the refreshed 1.40.x versions was not revalidated locally (no interpreter available)
 - **Protobuf-based**: Uses `protobuf` serialization (more efficient than JSON, standard for OTLP)
 - **Separate protocol packages**: gRPC and HTTP exporters are independent, allowing modular installation (though we include both for user flexibility)
 - **Well-documented**: Comprehensive docs at opentelemetry.io, active community
