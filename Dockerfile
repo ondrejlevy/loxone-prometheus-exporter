@@ -13,7 +13,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip==26.0.1 \
     && python -m pip install --no-cache-dir -r requirements.lock \
     && python -m pip install --no-cache-dir --no-deps .
 
-FROM python:3.14.3-alpine3.23@sha256:faee120f7885a06fcc9677922331391fa690d911c020abb9e8025ff3d908e510
+FROM python:3.14.3-alpine3.23
 
 LABEL org.opencontainers.image.title="Loxone Prometheus Exporter" \
       org.opencontainers.image.description="Exports Loxone Miniserver control values as Prometheus metrics" \
