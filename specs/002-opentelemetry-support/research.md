@@ -11,9 +11,9 @@
 ### Decision
 
 Use official OpenTelemetry Python SDK packages:
-- `opentelemetry-sdk==1.28.2` (core SDK, metrics API)
-- `opentelemetry-exporter-otlp-proto-grpc==1.28.2` (gRPC OTLP exporter)
-- `opentelemetry-exporter-otlp-proto-http==1.28.2` (HTTP OTLP exporter)
+- `opentelemetry-sdk==1.40.0` (core SDK, metrics API)
+- `opentelemetry-exporter-otlp-proto-grpc==1.40.0` (gRPC OTLP exporter)
+- `opentelemetry-exporter-otlp-proto-http==1.40.0` (HTTP OTLP exporter)
 
 ### Rationale
 
@@ -26,17 +26,17 @@ Use official OpenTelemetry Python SDK packages:
 ### Dependency Tree
 
 **Direct dependencies** (3 new):
-1. `opentelemetry-sdk` 1.28.2
-2. `opentelemetry-exporter-otlp-proto-grpc` 1.28.2
-3. `opentelemetry-exporter-otlp-proto-http` 1.28.2
+1. `opentelemetry-sdk` 1.40.0
+2. `opentelemetry-exporter-otlp-proto-grpc` 1.40.0
+3. `opentelemetry-exporter-otlp-proto-http` 1.40.0
 
 **Transitive dependencies** (~10 new):
-- `opentelemetry-api` 1.28.2 (SDK core API)
-- `opentelemetry-semantic-conventions` 0.49b2 (standard attributes)
-- `opentelemetry-proto` 1.28.2 (protobuf definitions)
-- `protobuf` ~=5.0 (Protocol Buffers runtime)
-- `grpcio` ~=1.60 (gRPC Python, only for gRPC exporter)
-- `googleapis-common-protos` ~=1.60 (Google protobuf types)
+- `opentelemetry-api` 1.40.0 (SDK core API)
+- `opentelemetry-semantic-conventions` 0.61b0 (standard attributes)
+- `opentelemetry-proto` 1.40.0 (protobuf definitions)
+- `protobuf` ~=7.0 (Protocol Buffers runtime)
+- `grpcio` ~=1.80 (gRPC Python, only for gRPC exporter)
+- `googleapis-common-protos` ~=1.74 (Google protobuf types)
 - `requests` ~=2.32 (HTTP client, only for HTTP exporter, already a transitive dep of aiohttp)
 - `backoff` ~=2.2 (retry backoff utility, used internally by exporters)
 - `deprecated` ~=1.2 (deprecation warnings decorator)
@@ -62,14 +62,14 @@ All packages are Apache 2.0 licensed, compatible with MIT project license:
 
 ### Compatibility Confirmation
 
-Tested installation on Python 3.13:
+Install example for Python 3.13+:
 ```bash
-pip install opentelemetry-sdk==1.28.2 \
-            opentelemetry-exporter-otlp-proto-grpc==1.28.2 \
-            opentelemetry-exporter-otlp-proto-http==1.28.2
+pip install opentelemetry-sdk==1.40.0 \
+            opentelemetry-exporter-otlp-proto-grpc==1.40.0 \
+            opentelemetry-exporter-otlp-proto-http==1.40.0
 ```
 
-**Status**: ✅ No conflicts, all wheels available for Python 3.13 on PyPI.
+**Status**: Package versions refreshed to the current PyPI line; compatibility was not revalidated in this workspace because no local Python interpreter was available.
 
 ### Alternatives Considered
 

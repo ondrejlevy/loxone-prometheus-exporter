@@ -10,7 +10,7 @@ Add push-based OpenTelemetry Protocol (OTLP) metrics export alongside existing P
 ## Technical Context
 
 **Language/Version**: Python 3.13 (existing project baseline)  
-**Primary Dependencies**: `opentelemetry-sdk` 1.28.x, `opentelemetry-exporter-otlp-proto-grpc` 1.28.x, `opentelemetry-exporter-otlp-proto-http` 1.28.x (new); existing: `prometheus_client` 0.24.x, `websockets` 16.x, `aiohttp` 3.13.x  
+**Primary Dependencies**: `opentelemetry-sdk` 1.40.x, `opentelemetry-exporter-otlp-proto-grpc` 1.40.x, `opentelemetry-exporter-otlp-proto-http` 1.40.x (new); existing: `prometheus_client` 0.24.x, `websockets` 16.x, `aiohttp` 3.13.x  
 **Storage**: N/A (in-memory metrics state, same as existing Prometheus export)  
 **Testing**: pytest + pytest-asyncio (existing), will add OTLP-specific contract/integration tests  
 **Target Platform**: Linux container (Docker/Podman, docker-compose orchestration) - existing  

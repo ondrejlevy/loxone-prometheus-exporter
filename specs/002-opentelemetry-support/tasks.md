@@ -24,7 +24,7 @@
 - [X] T004 Create src/loxone_exporter/otlp_exporter.py module skeleton
 
 **Completion Criteria**:
-- ✅ `pyproject.toml` includes opentelemetry-sdk~=1.28, opentelemetry-exporter-otlp-proto-grpc~=1.28, opentelemetry-exporter-otlp-proto-http~=1.28
+- ✅ `pyproject.toml` includes opentelemetry-sdk~=1.40, opentelemetry-exporter-otlp-proto-grpc~=1.40, opentelemetry-exporter-otlp-proto-http~=1.40
 - ✅ `pip install -e .` succeeds without conflicts
 - ✅ `otlp_exporter.py` module exists with docstring
 
