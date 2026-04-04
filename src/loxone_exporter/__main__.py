@@ -12,6 +12,7 @@ import asyncio
 import logging
 import signal
 import sys
+from typing import cast
 
 from prometheus_client import CollectorRegistry
 
@@ -93,46 +94,66 @@ async def _run(config_path: str | None) -> None:
     # Set up signal handlers for graceful shutdown
     loop = asyncio.get_running_loop()
     shutdown_event = asyncio.Event()
+    fallback_signal_handlers: list[tuple[signal.Signals, signal.Handlers]] = []
 
     def _signal_handler() -> None:
         logger.info("Shutdown signal received")
         shutdown_event.set()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, _signal_handler)
+        try:
+            loop.add_signal_handler(sig, _signal_handler)
+        except NotImplementedError:
+            previous_handler = cast("signal.Handlers", signal.getsignal(sig))
+
+            def _sync_signal_handler(_signum: int, _frame: object | None) -> None:
+                _signal_handler()
+
+            signal.signal(sig, _sync_signal_handler)
+            fallback_signal_handlers.append((sig, previous_handler))
 
     # Run all tasks
-    async with asyncio.TaskGroup() as tg:
-        # Start WebSocket clients
-        for client in clients:
-            tg.create_task(client.run())
+    try:
+        async with asyncio.TaskGroup() as tg:
+            # Start WebSocket clients
+            for client in clients:
+                tg.create_task(client.run())
 
-        # Start HTTP server
-        tg.create_task(run_http_server(app, config))
+            # Start HTTP server
+            tg.create_task(run_http_server(app, config))
 
-        # Start OTLP exporter if enabled
-        if otlp_exporter is not None:
-            async def _run_otlp(exporter: OTLPExporter) -> None:
-                await exporter.start()
-                try:
-                    # Keep running until cancelled
-                    while True:
-                        await asyncio.sleep(3600)
-                except asyncio.CancelledError:
-                    await exporter.stop()
-                    raise
-
-            tg.create_task(_run_otlp(otlp_exporter))
-
-        # Wait for shutdown signal, then cancel the group
-        async def _wait_for_shutdown() -> None:
-            await shutdown_event.wait()
-            logger.info("Shutting down gracefully...")
+            # Start OTLP exporter if enabled
             if otlp_exporter is not None:
-                await otlp_exporter.stop()
-            raise asyncio.CancelledError()
+                async def _run_otlp(exporter: OTLPExporter) -> None:
+                    await exporter.start()
+                    try:
+                        # Keep running until cancelled
+                        while True:
+                            await asyncio.sleep(3600)
+                    except asyncio.CancelledError:
+                        await exporter.stop()
+                        raise
 
-        tg.create_task(_wait_for_shutdown())
+                tg.create_task(_run_otlp(otlp_exporter))
+
+            # Wait for shutdown signal, then cancel the group
+            async def _wait_for_shutdown() -> None:
+                await shutdown_event.wait()
+                logger.info("Shutting down gracefully...")
+                if otlp_exporter is not None:
+                    await otlp_exporter.stop()
+                raise asyncio.CancelledError()
+
+            tg.create_task(_wait_for_shutdown())
+    finally:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.remove_signal_handler(sig)
+            except NotImplementedError:
+                continue
+
+        for sig, previous_handler in fallback_signal_handlers:
+            signal.signal(sig, previous_handler)
 
 
 def main(argv: list[str] | None = None) -> None:
