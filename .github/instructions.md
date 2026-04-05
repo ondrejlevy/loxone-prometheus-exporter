@@ -152,7 +152,7 @@ Detailed design documents live in `specs/001-loxone-metrics-export/`:
 - `pytest>=8.0`, `pytest-asyncio>=0.24`, `pytest-aiohttp>=1.0`, `pytest-cov>=6.0`
 - `mypy>=1.13`, `ruff>=0.8`, `types-PyYAML>=6.0`
 
-Pinned versions for reproducible Docker builds: `requirements.lock`
+Pinned versions for reproducible Docker builds: `uv.lock` (exported to a transient requirements file during image build)
 
 ---
 
@@ -347,5 +347,5 @@ If either tool reports remaining errors after auto-fix, you MUST resolve them ma
 2. Multi-stage build: builder installs deps → final image copies site-packages
 3. Non-root user (`exporter`, UID 1000)
 4. Healthcheck: `python -c "urllib.request.urlopen('http://localhost:9504/healthz')"` (no curl in slim)
-5. Dependencies locked in `requirements.lock` for reproducible builds
+5. Dependencies locked in `uv.lock`; Docker exports a transient requirements file during build for reproducible installs
 6. Use `podman` commands in documentation and scripts (not `docker`)

@@ -1,16 +1,20 @@
 FROM python:3.14.3-alpine3.23 AS builder
 
+COPY --from=ghcr.io/astral-sh/uv:0.11.3 /uv /uvx /bin/
+
 WORKDIR /app
 
 # Install build dependencies for Alpine
 RUN apk add --no-cache gcc musl-dev linux-headers libffi-dev
 
-COPY requirements.lock .
+COPY uv.lock .
 COPY pyproject.toml .
 COPY src/ src/
 
+RUN uv export --frozen --no-dev --no-emit-project --format requirements.txt --output-file requirements.txt
+
 RUN python -m pip install --no-cache-dir --upgrade pip==26.0.1 \
-    && python -m pip install --no-cache-dir -r requirements.lock \
+    && python -m pip install --no-cache-dir -r requirements.txt \
     && python -m pip install --no-cache-dir --no-deps .
 
 FROM python:3.14.3-alpine3.23
