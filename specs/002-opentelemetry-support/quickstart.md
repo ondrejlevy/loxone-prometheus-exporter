@@ -42,9 +42,9 @@ pip install -e ".[dev]"
 
 **New dependencies (added by this feature)**:
 ```
-opentelemetry-sdk~=1.28
-opentelemetry-exporter-otlp-proto-grpc~=1.28
-opentelemetry-exporter-otlp-proto-http~=1.28
+opentelemetry-sdk~=1.40
+opentelemetry-exporter-otlp-proto-grpc~=1.40
+opentelemetry-exporter-otlp-proto-http~=1.40
 ```
 
 ### 2. Start Test OTLP Collector

@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.2.0
+    image: prom/prometheus:v3.11.0
     container_name: loxone-prometheus
     ports:
       - "9090:9090"
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.5.1
+    image: grafana/grafana:11.6.14
     container_name: loxone-grafana
     ports:
       - "3000:3000"
