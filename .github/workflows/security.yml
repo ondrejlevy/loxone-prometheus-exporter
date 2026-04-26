@@ -45,6 +45,7 @@ jobs:
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "loxone-prometheus-exporter:scan"
+          cache: "false"
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
@@ -64,6 +65,7 @@ jobs:
         with:
           scan-type: "fs"
           scan-ref: "."
+          cache: "false"
           format: "sarif"
           output: "trivy-fs-results.sarif"
           severity: "CRITICAL,HIGH"
