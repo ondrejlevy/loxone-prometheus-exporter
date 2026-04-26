@@ -15,7 +15,7 @@ authors = [
 
 dependencies = [
     "websockets~=16.0",
-    "prometheus_client~=0.24",
+    "prometheus_client~=0.25",
     "aiohttp~=3.13",
     "PyYAML~=6.0",
     "pycryptodome~=3.23",
