@@ -29,10 +29,11 @@ jobs:
           cache: 'pip'
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
-          pip install pip-audit
+          pip install uv==0.11.3 pip-audit
       - name: Run pip-audit
-        run: pip-audit --desc
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements.txt --output-file runtime-requirements.txt
+          pip-audit -r runtime-requirements.txt --desc
 
   trivy-container:
     name: Trivy Container Scan

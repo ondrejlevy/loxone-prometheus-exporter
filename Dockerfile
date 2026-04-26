@@ -32,7 +32,8 @@ ENV LOXONE_EXPORTER_VERSION=${VERSION} \
     LOXONE_EXPORTER_BUILD_DATE=${BUILD_DATE}
 
 # Alpine uses addgroup/adduser instead of groupadd/useradd
-RUN addgroup -g 1000 exporter && \
+RUN apk upgrade --no-cache \
+    && addgroup -g 1000 exporter && \
     adduser -D -u 1000 -G exporter -s /sbin/nologin exporter
 
 WORKDIR /app
