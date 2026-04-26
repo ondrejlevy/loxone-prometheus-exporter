@@ -1,4 +1,4 @@
-FROM python:3.14.3-alpine3.23 AS builder
+FROM python:3.15.0a8-alpine3.23 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.3 /uv /uvx /bin/
 
@@ -17,7 +17,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip==26.0.1 \
     && python -m pip install --no-cache-dir -r requirements.txt \
     && python -m pip install --no-cache-dir --no-deps .
 
-FROM python:3.14.3-alpine3.23
+FROM python:3.15.0a8-alpine3.23
 
 LABEL org.opencontainers.image.title="Loxone Prometheus Exporter" \
       org.opencontainers.image.description="Exports Loxone Miniserver control values as Prometheus metrics" \
