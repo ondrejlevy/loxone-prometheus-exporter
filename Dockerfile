@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /bin/
 WORKDIR /app
 
 # Install build dependencies for Alpine
-RUN apk add --no-cache gcc musl-dev linux-headers libffi-dev
+RUN apk add --no-cache gcc g++ musl-dev linux-headers libffi-dev
 
 COPY uv.lock .
 COPY pyproject.toml .
