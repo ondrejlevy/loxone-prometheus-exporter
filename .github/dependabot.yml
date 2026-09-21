@@ -1,7 +1,8 @@
 version: 2
 updates:
-  # Python dependencies
-  - package-ecosystem: "pip"
+  # Python dependencies (uv ecosystem: updates pyproject.toml AND uv.lock
+  # together, so the `uv lock --check` CI gate stays satisfied)
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
