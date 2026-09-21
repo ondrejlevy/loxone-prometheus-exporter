@@ -78,7 +78,7 @@ async def _fetch_public_key_http(
     import urllib.request
 
     url = f"http://{host}:{port}/jdev/sys/getPublicKey"
-    req = urllib.request.Request(url)  # noqa: S310
+    req = urllib.request.Request(url)
     credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
     req.add_header("Authorization", f"Basic {credentials}")
 
