@@ -1,6 +1,6 @@
-FROM python:3.14.7-alpine3.23 AS builder
+FROM python:3.15.2-alpine3.24 AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -16,12 +16,12 @@ RUN uv export --frozen --no-dev --no-emit-project --format requirements.txt --ou
 # Install into a self-contained venv so the runtime stage never has to
 # reference an interpreter-version-specific site-packages path.
 RUN python -m venv /opt/venv \
-    && /opt/venv/bin/python -m pip install --no-cache-dir --upgrade pip==26.2.1 \
+    && /opt/venv/bin/python -m pip install --no-cache-dir --upgrade pip==26.3 \
     && /opt/venv/bin/python -m pip install --no-cache-dir --require-hashes -r requirements.txt \
     && /opt/venv/bin/python -m pip install --no-cache-dir --no-deps . \
     && /opt/venv/bin/python -m pip uninstall -y pip setuptools wheel || true
 
-FROM python:3.14.7-alpine3.23
+FROM python:3.15.2-alpine3.24
 
 LABEL org.opencontainers.image.title="Loxone Prometheus Exporter" \
       org.opencontainers.image.description="Exports Loxone Miniserver control values as Prometheus metrics" \
