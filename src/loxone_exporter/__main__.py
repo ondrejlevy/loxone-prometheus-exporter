@@ -29,7 +29,7 @@ from loxone_exporter.metrics import (
     scrape_errors_total,
 )
 from loxone_exporter.otlp_exporter import OTLPExporter
-from loxone_exporter.server import create_app, run_http_server
+from loxone_exporter.server import OTLP_EXPORTER_KEY, create_app, run_http_server
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ async def _run(config_path: str | None) -> None:
     otlp_exporter: OTLPExporter | None = None
     if config.opentelemetry.enabled:
         otlp_exporter = OTLPExporter(config.opentelemetry, registry)
-        app["otlp_exporter"] = otlp_exporter
+        app[OTLP_EXPORTER_KEY] = otlp_exporter
         logger.info("OTLP export enabled: %s → %s",
                      config.opentelemetry.protocol, config.opentelemetry.endpoint)
     else:

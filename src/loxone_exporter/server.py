@@ -16,14 +16,25 @@ from loxone_exporter.metrics import LoxoneCollector, scrape_errors_total
 
 if TYPE_CHECKING:
     from loxone_exporter.config import ExporterConfig
+    from loxone_exporter.otlp_exporter import OTLPExporter
     from loxone_exporter.structure import MiniserverState
 
 logger = logging.getLogger(__name__)
 
+# Typed keys for the state stored on the aiohttp Application. aiohttp 3.14.5
+# emits NotAppKeyWarning for plain string keys; AppKey also lets mypy infer
+# the value type at every ``app[KEY]`` read instead of returning ``Any``.
+# The types live only in annotations, so the TYPE_CHECKING-only imports above
+# are never needed at runtime (and the OpenTelemetry SDK stays lazily loaded).
+REGISTRY_KEY: web.AppKey[CollectorRegistry] = web.AppKey("registry")
+STATES_KEY: web.AppKey[list[MiniserverState]] = web.AppKey("states")
+CONFIG_KEY: web.AppKey[ExporterConfig] = web.AppKey("config")
+OTLP_EXPORTER_KEY: web.AppKey[OTLPExporter] = web.AppKey("otlp_exporter")
+
 
 async def _metrics_handler(request: web.Request) -> web.Response:
     """Handle GET /metrics — generate Prometheus text exposition format."""
-    registry: CollectorRegistry = request.app["registry"]
+    registry: CollectorRegistry = request.app[REGISTRY_KEY]
     try:
         output = generate_latest(registry)
         return web.Response(
@@ -39,8 +50,8 @@ async def _metrics_handler(request: web.Request) -> web.Response:
 
 async def _healthz_handler(request: web.Request) -> web.Response:
     """Handle GET /healthz — return JSON health status per OpenAPI spec."""
-    states: list[MiniserverState] = request.app["states"]
-    request.app["config"]
+    states: list[MiniserverState] = request.app[STATES_KEY]
+    request.app[CONFIG_KEY]
 
     miniservers = []
     for ms in states:
@@ -84,7 +95,7 @@ async def _healthz_handler(request: web.Request) -> web.Response:
     }
 
     # Include OTLP status if exporter is available
-    otlp_exporter = request.app.get("otlp_exporter")
+    otlp_exporter = request.app.get(OTLP_EXPORTER_KEY)
     if otlp_exporter is not None:
         from loxone_exporter.otlp_exporter import ExportState
 
@@ -126,9 +137,9 @@ def create_app(
         # Register scrape errors counter
         registry.register(scrape_errors_total)
 
-    app["registry"] = registry
-    app["states"] = states
-    app["config"] = config
+    app[REGISTRY_KEY] = registry
+    app[STATES_KEY] = states
+    app[CONFIG_KEY] = config
 
     app.router.add_get("/metrics", _metrics_handler)
     app.router.add_get("/healthz", _healthz_handler)

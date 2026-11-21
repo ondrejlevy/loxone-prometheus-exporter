@@ -18,7 +18,7 @@ dependencies = [
     "prometheus_client~=0.25",
     "aiohttp~=3.13",
     "PyYAML~=6.0",
-    "pycryptodome~=3.23",
+    "pycryptodome>=3.23,<5",
     "opentelemetry-sdk~=1.40",
     "opentelemetry-exporter-otlp-proto-grpc~=1.41",
     "opentelemetry-exporter-otlp-proto-http~=1.40",
@@ -41,6 +41,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "contract: marks tests as contract tests",

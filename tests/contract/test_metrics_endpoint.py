@@ -474,7 +474,7 @@ class TestOTLPHealthMetricsContract:
         from unittest.mock import MagicMock
 
         from loxone_exporter.otlp_exporter import ExportState, ExportStatus
-        from loxone_exporter.server import create_app
+        from loxone_exporter.server import OTLP_EXPORTER_KEY, create_app
 
         app = create_app(sample_exporter_config, states=[sample_miniserver_state])
 
@@ -485,7 +485,7 @@ class TestOTLPHealthMetricsContract:
             last_success_timestamp=1700000000.0,
             consecutive_failures=0,
         )
-        app["otlp_exporter"] = mock_exporter
+        app[OTLP_EXPORTER_KEY] = mock_exporter
 
         client = await aiohttp_client(app)
         resp = await client.get("/healthz")
@@ -507,7 +507,7 @@ class TestOTLPHealthMetricsContract:
         from unittest.mock import MagicMock
 
         from loxone_exporter.otlp_exporter import ExportState, ExportStatus
-        from loxone_exporter.server import create_app
+        from loxone_exporter.server import OTLP_EXPORTER_KEY, create_app
 
         app = create_app(sample_exporter_config, states=[sample_miniserver_state])
 
@@ -517,7 +517,7 @@ class TestOTLPHealthMetricsContract:
             consecutive_failures=10,
             last_error="Connection refused",
         )
-        app["otlp_exporter"] = mock_exporter
+        app[OTLP_EXPORTER_KEY] = mock_exporter
 
         # Ensure miniserver is connected so base status would be "healthy"
         sample_miniserver_state.connected = True
